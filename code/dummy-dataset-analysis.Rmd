@@ -1,0 +1,49 @@
+---
+title: "Setup of Chapter 1 analyses"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, echo = F}
+library(tidyverse)
+```
+
+Here I aim to simulate data in the same format as the data I will be analyzing in this chapter. There are three major types of data, summarized here.
+
+### Plant performance data
+
+This will be a dataframe of the number of the performance of each species X site X rep in the absence of competitors. Performance will be described in two ways: 1) Raw number of seeds produced (estimated by measuring flower-heads in the field, and using size-to-seed conversions based on counting seeds in lab), and 2) Number of viable seeds produced. Note that species viability will not be at the species-by-site level, but rather at the species level. The dataframe will look something like this:
+
+```
+site  species_code  replicate num_seeds_raw num_seeds_viable
+plot_740  PLER  1 144 100
+plot_740  PLER  2 200 160
+plot_740  PLER  3 820 700
+...
+```
+
+There will data from 24 sites, 17 species, and 5 replicate individuals per species, for a total of `r 24*17*5` rows. 
+
+Two important decisions need to be made: 1) What is to be made of 0s? 2) Do seed production numbers get scaled by species? The first is important because many species simply fail to germinate or survive to seed production at many sites. The second may be important because the seed production numbers span quite a large range - from 0, to thousands. It's unclear to me whether this matters in the analysis.
+
+In the first dataset I simulate, the seed production numbers will be drawn from a random distribution, with a different mean per species. 
+
+```{r generate-dummy-data-random}
+set.seed(1)
+n_species <- 10
+n_reps <- 5
+n_sites <- 20
+
+# Seed viabiliities drawn from a uniform distribution
+seed_viabilities <- runif(min = 0.2, max = 0.95, n_species)
+# Mean seed production of species drawn from a lognormal, plus uniform noise
+mean_seedprod <- floor(rlnorm(10, 2, 4)+runif(min = 10, max = 100, 10))
+# To Do:
+# Make a matrix of Species By Site preference (pre-determined for this dummy analysis)
+# Then, use that to scale the seed output drawn from the distribution below: 
+for(ii in 1:n_species){
+  print(rpois(n = n_reps*n_sites, lambda = mean_seedprod[ii]))
+}
+
+```
