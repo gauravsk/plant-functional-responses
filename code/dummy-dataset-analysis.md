@@ -1,13 +1,13 @@
     library(tidyverse)
 
-    ## ── Attaching packages ─────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 1.2.1 ──
+    ## ── Attaching packages ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 1.2.1 ──
 
     ## ✔ ggplot2 2.2.1     ✔ purrr   0.2.4
     ## ✔ tibble  1.4.2     ✔ dplyr   0.7.4
     ## ✔ tidyr   0.8.0     ✔ stringr 1.2.0
     ## ✔ readr   1.1.1     ✔ forcats 0.2.0
 
-    ## ── Conflicts ────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ── Conflicts ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
     ## ✖ dplyr::filter() masks stats::filter()
     ## ✖ dplyr::lag()    masks stats::lag()
 
@@ -65,9 +65,6 @@ drawn from a random distribution, with a different mean per species.
     seed_viabilities <- runif(min = 0.2, max = 0.95, n_species)
     # Mean seed production of species drawn from a lognormal, plus uniform noise
     mean_seedprod <- floor(rlnorm(10, 2, 4)+runif(min = 10, max = 100, 10))
-    # To Do:
-    # Make a matrix of Species By Site preference (pre-determined for this dummy analysis)
-    # Then, use that to scale the seed output drawn from the distribution below: 
 
     site_preference <- matrix(NA, nrow = n_sites, ncol = n_species)
     for(current_species in 1:ncol(site_preference)) {
@@ -176,7 +173,7 @@ here) is normally distributed. We can relax this with generalized linear
 models, where we can allow the response to have a different family of
 distribution (Poisson makes sense here).
 
-    glmer(data = merged_df, formula = seed_production~1|species, family = poisson(link = log))
+    glmer(data = merged_df, formula = seed_production~1|species, family = poisson(link = log), control=glmerControl(optimizer="bobyqa"))
 
     ## Generalized linear mixed model fit by maximum likelihood (Laplace
     ##   Approximation) [glmerMod]
@@ -193,20 +190,11 @@ distribution (Poisson makes sense here).
     ## (Intercept)  
     ##       4.006
 
-    glmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species), family = poisson(link = log))
+    # glmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species), family = poisson(link = log), control=glmerControl(optimizer="bobyqa"))
 
-    ## Generalized linear mixed model fit by maximum likelihood (Laplace
-    ##   Approximation) [glmerMod]
-    ##  Family: poisson  ( log )
-    ## Formula: seed_production ~ soil_depth_cm + (soil_depth_cm | species)
-    ##    Data: merged_df
-    ##       AIC       BIC    logLik  deviance  df.resid 
-    ## 178919.54 178944.08 -89454.77 178909.54       995 
-    ## Random effects:
-    ##  Groups  Name          Std.Dev. Corr 
-    ##  species (Intercept)   1.36603       
-    ##          soil_depth_cm 0.01325  -0.25
-    ## Number of obs: 1000, groups:  species, 10
-    ## Fixed Effects:
-    ##   (Intercept)  soil_depth_cm  
-    ##      3.985955       0.001475
+To Do
+-----
+
+Need to think about how to bring in species traits. But I think it
+doesn't make much sense to do that quite yet- will focus instead on
+trying to repeat these steps so far with the actual data.

@@ -38,9 +38,6 @@ sp_codes <- LETTERS[1:n_species]
 seed_viabilities <- runif(min = 0.2, max = 0.95, n_species)
 # Mean seed production of species drawn from a lognormal, plus uniform noise
 mean_seedprod <- floor(rlnorm(10, 2, 4)+runif(min = 10, max = 100, 10))
-# To Do:
-# Make a matrix of Species By Site preference (pre-determined for this dummy analysis)
-# Then, use that to scale the seed output drawn from the distribution below: 
 
 site_preference <- matrix(NA, nrow = n_sites, ncol = n_species)
 for(current_species in 1:ncol(site_preference)) {
@@ -111,7 +108,10 @@ lmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|
 The models above assume that the response variable (`seed_production` here) is normally distributed. We can relax this with generalized linear models, where we can allow the response to have a different family of distribution (Poisson makes sense here).
 
 ```{r generalized-linear-model}
-glmer(data = merged_df, formula = seed_production~1|species, family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~1|species, family = poisson(link = log), control=glmerControl(optimizer="bobyqa"))
 
-glmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species), family = poisson(link = log))
+# glmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species), family = poisson(link = log), control=glmerControl(optimizer="bobyqa"))
 ```
+## To Do
+
+Need to think about how to bring in species traits. But I think it doesn't make much sense to do that quite yet- will focus instead on trying to repeat these steps so far with the actual data. 
