@@ -1,11 +1,9 @@
 ---
 title: "Setup of Chapter 1 analyses"
-output: html
-editor_options: 
-  chunk_output_type: inline
+output: md_document
 ---
 
-```{r setup, echo = F}
+```{r setup, echo = T}
 library(tidyverse)
 library(lme4)
 ```
@@ -71,10 +69,12 @@ seed_prod_long <- tidyr::gather(seed_prod, species, seed_production, A:J) %>% tb
 Now that we have some dummy data generated, let's plot it to explore what the heck I just did
 
 ```{r plot-exploratory-data}
-
 gg_raw_seed <- ggplot(seed_prod_long) + geom_boxplot(aes(site,seed_production+1)) + 
   facet_wrap(~species, ncol = 5) + scale_y_log10()
 gg_raw_seed + theme_gray()
+
+gg_rawseed_hist <- ggplot(seed_prod_long) + geom_histogram(aes(seed_production+1))
+gg_rawseed_hist + scale_x_log10() # Note logged X-axis
 ```
 
 The details are not super relevant, just that there's some distribution of species performance by site...
@@ -82,7 +82,8 @@ The details are not super relevant, just that there's some distribution of speci
 ### Simulating environmental data
 
 Now, we need to simulate some environmental data for each of our sites.
-**For now, these variables are all random variables- but I will update them to reflect the distribution of the true environmental data. 
+**For now, these variables are all random variables- but I will update them to reflect the distribution of the true environmental data. **
+
 ```{r simulate-env-data}
 site_data <- data.frame(site = paste0("plot_",(1:n_sites)),
                         soil_depth_cm = round(runif(min = 5, max = 20, n = n_sites),digits = 2),
@@ -91,7 +92,26 @@ site_data <- data.frame(site = paste0("plot_",(1:n_sites)),
 
 ## Begin exploring models
 
-```{r explore-lms}
-# lmer()
+I need to read more of the [`lme4` package vignette](https://cran.r-project.org/web/packages/lme4/vignettes/lmer.pdf) before getting too deep into this.
 
+```{r explore-lms}
+# Merge the data frame so that the environmental variables are added on.
+merged_df <- left_join(seed_prod_long, site_data)
+gg_seed_v_sdep <- ggplot(merged_df) + geom_point(aes(x = soil_depth_cm, y = seed_production+1)) + 
+  facet_wrap(~ species, ncol = 5) + scale_y_log10()
+gg_seed_v_sdep
+
+# Model seed production with species as the random effect
+lmer(data = merged_df, formula = seed_production~1|species)
+
+# Model seed production as a function of soil depth, with species as the random effect
+lmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species))
+```
+
+The models above assume that the response variable (`seed_production` here) is normally distributed. We can relax this with generalized linear models, where we can allow the response to have a different family of distribution (Poisson makes sense here).
+
+```{r generalized-linear-model}
+glmer(data = merged_df, formula = seed_production~1|species, family = poisson(link = log))
+
+glmer(data = merged_df, formula = seed_production~soil_depth_cm + (soil_depth_cm|species), family = poisson(link = log))
 ```
