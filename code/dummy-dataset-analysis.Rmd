@@ -1,17 +1,18 @@
 ---
 title: "Setup of Chapter 1 analyses"
-output: html_notebook
+output: html
 editor_options: 
   chunk_output_type: inline
 ---
 
 ```{r setup, echo = F}
 library(tidyverse)
+library(lme4)
 ```
 
 Here I aim to simulate data in the same format as the data I will be analyzing in this chapter. There are three major types of data, summarized here.
 
-### Plant performance data
+### Simulate plant performance data
 
 This will be a dataframe of the number of the performance of each species X site X rep in the absence of competitors. Performance will be described in two ways: 1) Raw number of seeds produced (estimated by measuring flower-heads in the field, and using size-to-seed conversions based on counting seeds in lab), and 2) Number of viable seeds produced. Note that species viability will not be at the species-by-site level, but rather at the species level. The dataframe will look something like this:
 
@@ -34,7 +35,7 @@ set.seed(1)
 n_species <- 10
 n_reps <- 5
 n_sites <- 20
-
+sp_codes <- LETTERS[1:n_species]
 # Seed viabiliities drawn from a uniform distribution
 seed_viabilities <- runif(min = 0.2, max = 0.95, n_species)
 # Mean seed production of species drawn from a lognormal, plus uniform noise
@@ -42,8 +43,55 @@ mean_seedprod <- floor(rlnorm(10, 2, 4)+runif(min = 10, max = 100, 10))
 # To Do:
 # Make a matrix of Species By Site preference (pre-determined for this dummy analysis)
 # Then, use that to scale the seed output drawn from the distribution below: 
-for(ii in 1:n_species){
-  print(rpois(n = n_reps*n_sites, lambda = mean_seedprod[ii]))
+
+site_preference <- matrix(NA, nrow = n_sites, ncol = n_species)
+for(current_species in 1:ncol(site_preference)) {
+  preference_vector <- c(sample(seq(from = 0.1, to = 1, by = 0.1)),
+                         sample(seq(from = 0, to = 0.9, by = 0.1)))
+  preference_vector[sample(1:n_sites, size = 5)] = 0
+  if(max(preference_vector) != 1) {preference_vector[sample(1:20, size = 1)] = 1}
+  site_preference[,current_species] <- preference_vector
 }
+
+seed_prod <- data.frame(site = paste0("plot_",(rep(1:n_sites, each = n_reps))),
+                        replicate = rep(1:n_reps, n_sites))
+
+for(ii in 1:n_species){
+  nsp <-rpois(n = n_reps*n_sites, lambda = mean_seedprod[ii])
+  nsp <- as.numeric(floor(nsp*site_preference[,ii]))
+  seed_prod <- cbind(seed_prod, nsp)
+  colnames(seed_prod)[ii+2] <- LETTERS[ii]
+}
+
+seed_prod_long <- tidyr::gather(seed_prod, species, seed_production, A:J) %>% tbl_df %>% 
+  mutate(site = as.factor(site), replicate = as.factor(replicate))
+
+```
+
+Now that we have some dummy data generated, let's plot it to explore what the heck I just did
+
+```{r plot-exploratory-data}
+
+gg_raw_seed <- ggplot(seed_prod_long) + geom_boxplot(aes(site,seed_production+1)) + 
+  facet_wrap(~species, ncol = 5) + scale_y_log10()
+gg_raw_seed + theme_gray()
+```
+
+The details are not super relevant, just that there's some distribution of species performance by site...
+
+### Simulating environmental data
+
+Now, we need to simulate some environmental data for each of our sites.
+**For now, these variables are all random variables- but I will update them to reflect the distribution of the true environmental data. 
+```{r simulate-env-data}
+site_data <- data.frame(site = paste0("plot_",(1:n_sites)),
+                        soil_depth_cm = round(runif(min = 5, max = 20, n = n_sites),digits = 2),
+                        mg_ppm = abs(rnorm(n = n_sites, mean = 10, sd = 2)))
+```
+
+## Begin exploring models
+
+```{r explore-lms}
+# lmer()
 
 ```
