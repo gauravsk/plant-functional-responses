@@ -14,6 +14,7 @@ Here I begin to recreate the dummy analyses presented in [this document](dummy-d
 ```{r}
 library(tidyverse)
 library(lme4)
+library(vegan)
 ```
 
 Let's import in the performance data and clean it up to our needs.
@@ -62,7 +63,7 @@ gg_seed + geom_point(aes(x = NH4_N_ppm))
 
 Now we play with some models
 
-```{r}
+```{r, eval = F}
 glmer(data = merged_df, formula = seed_production~depth + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~Tmax + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~organic_matter_ENR + (1|species), family = poisson(link = log))
@@ -76,3 +77,10 @@ glmer(data = merged_df, formula = seed_production~sand + (1|species), family = p
 glmer(data = merged_df, formula = seed_production~NH4_N_ppm + (1|species), family = poisson(link = log))
 ```
 
+Let's do an NMDS on the soil environmental data.  
+
+```{r}
+env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon) %>% tibble::column_to_rownames(plot) 
+m <- metaMDS(env_dat_c)
+plot(m)
+```
