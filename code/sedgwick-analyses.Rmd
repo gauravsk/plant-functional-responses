@@ -1,0 +1,78 @@
+---
+title: "Doing the analyses on real data"
+author: "Gaurav Kandlikar"
+date: "February 16, 2018"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Here I begin to recreate the dummy analyses presented in [this document](dummy-dataset-analysis.md)
+
+```{r}
+library(tidyverse)
+library(lme4)
+```
+
+Let's import in the performance data and clean it up to our needs.
+
+```{r manage-performance-data}
+
+dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv",col_names = T, delim = ",")
+
+dat <- dat %>% filter(plot_type == "L") %>% 
+  mutate(plot_num = paste0("plot_", plot_num),
+               replicate = as.factor(replicate),
+               num_seeds_produced = ifelse(is.na(num_seeds_produced), 0, num_seeds_produced)) %>%
+  rename(species = sp_code, seed_production = num_seeds_produced, site = plot_num) %>% select(-plot_type)
+
+dat
+
+gg_raw_seed <- ggplot(dat) + geom_boxplot(aes(site,seed_production+1)) + 
+  facet_wrap(~species, ncol = 5) + scale_y_log10()
+gg_raw_seed
+
+gg_rawseed_hist <- ggplot(dat) + geom_histogram(aes(seed_production+1))
+gg_rawseed_hist + scale_x_log10() # Note logged X-axis
+```
+
+Now we import the environmental data
+
+```{r}
+site_data <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv", delim = ",") 
+site_data <- site_data %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
+merged_df <- left_join(dat, site_data)
+
+theme_set(theme_bw())
+gg_seed <- ggplot(merged_df, aes(y = seed_production+1)) + facet_wrap(~ species, ncol = 5) + scale_y_log10()
+gg_seed + geom_point(aes(x = depth))
+gg_seed + geom_point(aes(x = Tmax))
+gg_seed + geom_point(aes(x = organic_matter_ENR))
+gg_seed + geom_point(aes(x = pH))
+gg_seed + geom_point(aes(x = CEC_meq_100g))
+gg_seed + geom_point(aes(x = soil_moisture))
+gg_seed + geom_point(aes(x = Nitrate_ppm))
+gg_seed + geom_point(aes(x = Mg_ppm))
+gg_seed + geom_point(aes(x = Ca_ppm))
+gg_seed + geom_point(aes(x = sand))
+gg_seed + geom_point(aes(x = NH4_N_ppm))
+```
+
+Now we play with some models
+
+```{r}
+glmer(data = merged_df, formula = seed_production~depth + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~Tmax + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~organic_matter_ENR + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~pH + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~CEC_meq_100g + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~soil_moisture + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~Nitrate_ppm + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~Mg_ppm + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~Ca_ppm + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~sand + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~NH4_N_ppm + (1|species), family = poisson(link = log))
+```
+
