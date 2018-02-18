@@ -2,7 +2,7 @@
 title: "Doing the analyses on real data"
 author: "Gaurav Kandlikar"
 date: "February 16, 2018"
-output: md_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -12,16 +12,19 @@ knitr::opts_chunk$set(echo = TRUE)
 Here I begin to recreate the dummy analyses presented in [this document](dummy-dataset-analysis.md)
 
 ```{r}
-library(tidyverse)
+library(tidyverse); theme_set(theme_bw())
 library(lme4)
 library(vegan)
+library(glmmTMB)
+library(bbmle)
 ```
 
 Let's import in the performance data and clean it up to our needs.
 
 ```{r manage-performance-data}
 
-dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv",col_names = T, delim = ",")
+dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
+                  col_names = T, delim = ",")
 
 dat <- dat %>% filter(plot_type == "L") %>% 
   mutate(plot_num = paste0("plot_", plot_num),
@@ -42,12 +45,42 @@ gg_rawseed_hist + scale_x_log10() # Note logged X-axis
 Now we import the environmental data
 
 ```{r}
-site_data <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv", delim = ",") 
-site_data <- site_data %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
-merged_df <- left_join(dat, site_data)
+env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv", 
+                      delim = ",") 
+env_dat <- env_dat %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
+# skimr::skim(env_dat) %>% select(-missing, -complete, -n)
 
-theme_set(theme_bw())
-gg_seed <- ggplot(merged_df, aes(y = seed_production+1)) + facet_wrap(~ species, ncol = 5) + scale_y_log10()
+plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
+     pch = 21, bg = alpha("black", .25))
+```
+
+
+Before going too far into the models, let's do an NMDS- there's a lot of soil variables to consider, so it might be wise to reduce dimensionality if there are colinear columns.
+
+```{r soil-nmds}
+# Subset the dataset to filter out some of the columns that are factors, or are repetitive...
+env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon, -Tmin, -ele) %>% 
+  as.data.frame %>% tibble::column_to_rownames("site") 
+soilmds <- metaMDS(env_dat_c)
+plot(soilmds)
+orditorp(soilmds, display="species", cex = 1.2)
+plot(soilmds)
+orditorp(soilmds, display="sites")
+
+# Merge in the MDS scores into the env_dat dataframe
+env_dat <- left_join(env_dat, soilmds$points %>% as.data.frame %>% tibble::rownames_to_column("site"))
+
+# Take a look at what the distribution looks like. 
+# skimr::skim(env_dat %>% select(MDS1, MDS2))
+# Merge in the environmental data with the performance-by-site data, for easier modeling later. 
+merged_df <- left_join(dat, env_dat)
+```
+
+Let's do some exploratory plotting of seed production vs. environmental factors
+```{r plot-seedprod-v-env, eval = F}
+gg_seed <- ggplot(merged_df, aes(y = seed_production+1)) + 
+  facet_wrap(~ species, ncol = 5) + scale_y_log10()
+
 gg_seed + geom_point(aes(x = depth))
 gg_seed + geom_point(aes(x = Tmax))
 gg_seed + geom_point(aes(x = organic_matter_ENR))
@@ -59,11 +92,15 @@ gg_seed + geom_point(aes(x = Mg_ppm))
 gg_seed + geom_point(aes(x = Ca_ppm))
 gg_seed + geom_point(aes(x = sand))
 gg_seed + geom_point(aes(x = NH4_N_ppm))
+gg_seed + geom_point(aes(x = MDS1))
+gg_seed + geom_point(aes(x = MDS2))
+
 ```
 
-Now we play with some models
 
-```{r, eval = F}
+And let's do a first pass on modeling seed production as a function of each environmental variable independently.
+
+```{r bunch-of-glmers, eval = F}
 glmer(data = merged_df, formula = seed_production~depth + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~Tmax + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~organic_matter_ENR + (1|species), family = poisson(link = log))
@@ -75,12 +112,51 @@ glmer(data = merged_df, formula = seed_production~Mg_ppm + (1|species), family =
 glmer(data = merged_df, formula = seed_production~Ca_ppm + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~sand + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~NH4_N_ppm + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~MDS1 + (1|species), family = poisson(link = log))
+glmer(data = merged_df, formula = seed_production~MDS2 + (1|species), family = poisson(link = log))
 ```
 
-Let's do an NMDS on the soil environmental data.  
+An alternative (and I'm not sure at this stage which is the better approach to this problem) is to do a complete model.
 
-```{r}
-env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon) %>% tibble::column_to_rownames(plot) 
-m <- metaMDS(env_dat_c)
-plot(m)
+```{r complete-glmer-model, eval = F}
+glmer(data = merged_df, formula = seed_production~depth+Tmax+organic_matter_ENR+pH+CEC_meq_100g+soil_moisture+
+        Nitrate_ppm + Mg_ppm + Ca_ppm + sand + NH4_N_ppm + MDS1 + MDS2 + (1|site), family = poisson)
+```
+
+
+## I think I need to take a step back.
+There's a ton of complexity in these models and I'm getting a little overwhelmed by the number of options. So I want to take a step back and break down what I am trying to do here. 
+
+The core question for this portion of the analysis is **whether seed production responds to site-variation, and whether species differ in their responses**. Let's break things down and focus on this question, without worrying about environmental variation for now.
+
+I will go back to the data frame `dat`, which has the following structure: 
+
+```{r show-dat}
+dat %>% head
+```
+
+Remember from above that `seed_production` is count data and, based on the histogram, seems to have a zero-inflation problem. I will use the modeling functionality in the package **`glmmTMB`** to tackle this dataset. 
+
+```{r, eval = F}
+# First, a poisson model with species and plot as fixed effect, replicate as random effect  
+
+# The zero-eth model just has a species effect and no site effect
+pm0 = glmmTMB(seed_production~species + (1|replicate), dat, family=poisson)
+pm1 = glmmTMB(seed_production~species + site + (1|replicate), dat, family=poisson)
+# pm2 = glmmTMB(seed_production~species * site + (1|replicate), dat, family=poisson)
+
+
+nb0 = glmmTMB(seed_production~species + (1|replicate), dat, family=nbinom2)
+nb1 = glmmTMB(seed_production~species + site + (1|replicate), dat, family=nbinom2)
+nb2 = glmmTMB(seed_production~species * site + (1|replicate), dat, family=nbinom2)
+zipm0 = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=poisson)
+# zipm1 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=poisson)
+zipm1 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=nbinom2)
+zipm2 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species + site, dat, family=nbinom2)
+# zipm3 = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=poisson)
+
+
+bbmle::AICtab(pm0, pm1, 
+              nb0,nb1,nb2,
+              zipm0, zipm1,zipm2)
 ```
