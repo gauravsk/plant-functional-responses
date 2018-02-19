@@ -2,11 +2,12 @@
 title: "Doing the analyses on real data"
 author: "Gaurav Kandlikar"
 date: "February 16, 2018"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+thinkpad = T
 ```
 
 Here I begin to recreate the dummy analyses presented in [this document](dummy-dataset-analysis.md)
@@ -23,8 +24,13 @@ Let's import in the performance data and clean it up to our needs.
 
 ```{r manage-performance-data}
 
-dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
+if(thinkpad){
+  dat <- read_delim("../data/performance/seed_production_processed.csv", 
                   col_names = T, delim = ",")
+} else {
+  dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
+                    col_names = T, delim = ",")
+}
 
 dat <- dat %>% filter(plot_type == "L") %>% 
   mutate(plot_num = paste0("plot_", plot_num),
@@ -45,8 +51,12 @@ gg_rawseed_hist + scale_x_log10() # Note logged X-axis
 Now we import the environmental data
 
 ```{r}
-env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv", 
-                      delim = ",") 
+if(thinkpad){
+  env_dat <- read_delim("../data/environmental/all_environmental_data.csv", delim = ",")
+} else {
+  env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv",
+                        delim = ",") 
+}
 env_dat <- env_dat %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
 # skimr::skim(env_dat) %>% select(-missing, -complete, -n)
 
@@ -77,7 +87,7 @@ merged_df <- left_join(dat, env_dat)
 ```
 
 Let's do some exploratory plotting of seed production vs. environmental factors
-```{r plot-seedprod-v-env, eval = F}
+```{r plot-seedprod-v-env, eval = T}
 gg_seed <- ggplot(merged_df, aes(y = seed_production+1)) + 
   facet_wrap(~ species, ncol = 5) + scale_y_log10()
 
@@ -100,7 +110,7 @@ gg_seed + geom_point(aes(x = MDS2))
 
 And let's do a first pass on modeling seed production as a function of each environmental variable independently.
 
-```{r bunch-of-glmers, eval = F}
+```{r bunch-of-glmers, eval = T}
 glmer(data = merged_df, formula = seed_production~depth + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~Tmax + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~organic_matter_ENR + (1|species), family = poisson(link = log))
@@ -112,19 +122,19 @@ glmer(data = merged_df, formula = seed_production~Mg_ppm + (1|species), family =
 glmer(data = merged_df, formula = seed_production~Ca_ppm + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~sand + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~NH4_N_ppm + (1|species), family = poisson(link = log))
-glmer(data = merged_df, formula = seed_production~MDS1 + (1|species), family = poisson(link = log))
-glmer(data = merged_df, formula = seed_production~MDS2 + (1|species), family = poisson(link = log))
+a <- glmer(data = merged_df, formula = seed_production~MDS1 + (seed_production|species), family = poisson(link = log))
+b <- glmer(data = merged_df, formula = seed_production~MDS2 + (1|species), family = poisson(link = log))
 ```
 
 An alternative (and I'm not sure at this stage which is the better approach to this problem) is to do a complete model.
 
-```{r complete-glmer-model, eval = F}
+```{r complete-glmer-model, eval = T}
 glmer(data = merged_df, formula = seed_production~depth+Tmax+organic_matter_ENR+pH+CEC_meq_100g+soil_moisture+
         Nitrate_ppm + Mg_ppm + Ca_ppm + sand + NH4_N_ppm + MDS1 + MDS2 + (1|site), family = poisson)
 ```
 
 
-## I think I need to take a step back.
+# I think I need to take a step back.
 There's a ton of complexity in these models and I'm getting a little overwhelmed by the number of options. So I want to take a step back and break down what I am trying to do here. 
 
 The core question for this portion of the analysis is **whether seed production responds to site-variation, and whether species differ in their responses**. Let's break things down and focus on this question, without worrying about environmental variation for now.
@@ -137,26 +147,91 @@ dat %>% head
 
 Remember from above that `seed_production` is count data and, based on the histogram, seems to have a zero-inflation problem. I will use the modeling functionality in the package **`glmmTMB`** to tackle this dataset. 
 
-```{r, eval = F}
+```{r, eval = T}
 # First, a poisson model with species and plot as fixed effect, replicate as random effect  
 
 # The zero-eth model just has a species effect and no site effect
 pm0 = glmmTMB(seed_production~species + (1|replicate), dat, family=poisson)
 pm1 = glmmTMB(seed_production~species + site + (1|replicate), dat, family=poisson)
-# pm2 = glmmTMB(seed_production~species * site + (1|replicate), dat, family=poisson)
-
-
+pm2 = glmmTMB(seed_production~species * site + (1|replicate), dat, family=poisson)
 nb0 = glmmTMB(seed_production~species + (1|replicate), dat, family=nbinom2)
 nb1 = glmmTMB(seed_production~species + site + (1|replicate), dat, family=nbinom2)
 nb2 = glmmTMB(seed_production~species * site + (1|replicate), dat, family=nbinom2)
 zipm0 = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=poisson)
-# zipm1 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=poisson)
-zipm1 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=nbinom2)
-zipm2 = glmmTMB(seed_production~species + site +(1|replicate), zi=~species + site, dat, family=nbinom2)
-# zipm3 = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=poisson)
+zipm0nb = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=nbinom2)
+zipm1nb = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=nbinom2)
+zipm2nb = glmmTMB(seed_production~species + site +(1|replicate), zi=~species + site, dat, family=nbinom2)
+zipm3nb = glmmTMB(seed_production~species * site +(1|replicate), zi=~species + site, dat, family=nbinom2)
+zipm4nb = glmmTMB(seed_production~species * site +(1|replicate), zi=~species * site, dat, family=nbinom2)
 
-
-bbmle::AICtab(pm0, pm1, 
+aic_table <- bbmle::AICtab(pm0, pm1, pm2, 
               nb0,nb1,nb2,
-              zipm0, zipm1,zipm2)
+              zipm0, 
+              zipm0nb, zipm1nb,zipm2nb, zipm3nb, zipm4nb)
+aic_table
 ```
+According to the AIC table above it looks like the model `r attr(aic_table, "row.names")[1]` has the lowest AIC and therefore the most support in this framework. A good thing to check at this point is whether the same result holds if we *scale* the performance data (so that the per-species mean is 0 and the per-species SD = 1)
+```{r model-scaled-seedprod}
+# Scale by species
+# Define a custom function to scale
+scale_this <- function(x) as.vector(scale(x))
+
+dat_scaled <- dat %>% tidyr::spread(species, seed_production) %>% 
+  mutate_if(is.numeric, scale_this) %>% 
+  unite(id, c("site", "replicate"), sep = "XX") %>%
+  tidyr::gather("species", "seed_production",2:18) %>% 
+  separate(id, c("site", "replicate"), sep = "XX")
+
+dat_scaled
+
+pm0_s = glmmTMB(seed_production~species + (1|replicate), dat_scaled)
+pm1_s = glmmTMB(seed_production~species + site + (1|replicate), dat_scaled)
+pm2_s = glmmTMB(seed_production~species * site + (1|replicate), dat_scaled)
+nb0_s = glmmTMB(seed_production~species + (1|replicate), dat_scaled)
+nb1_s = glmmTMB(seed_production~species + site + (1|replicate), dat_scaled)
+nb2_s = glmmTMB(seed_production~species * site + (1|replicate), dat_scaled)
+zipm0_s = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat_scaled)
+zipm1_s = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat_scaled)
+zipm2_s = glmmTMB(seed_production~species + site +(1|replicate), zi=~species + site, dat_scaled)
+
+
+aic_table2 <- bbmle::AICtab(pm0_s, pm1_s, pm2_s, 
+              nb0_s,nb1_s,nb2_s,
+              zipm0_s, zipm1_s, zipm2_s)
+aic_table2
+
+```
+And for measure, let's also consider seed production as a *proportion*, i.e. where the seed performance for a species is equal to 1 at it's maximum seed performance
+
+
+```{r model-proportional-seedprod}
+# Scale by species
+# Define a custom function to scale
+prop_this <- function(x) as.vector(x/(max(x, na.rm = T)))
+
+dat_prop <- dat %>% tidyr::spread(species, seed_production) %>% 
+  mutate_if(is.numeric, prop_this) %>% 
+  unite(id, c("site", "replicate"), sep = "XX") %>%
+  tidyr::gather("species", "seed_production",2:18) %>% 
+  separate(id, c("site", "replicate"), sep = "XX")
+
+dat_prop
+
+pm0_p = glmmTMB(seed_production~species + (1|replicate), dat, family=poisson)
+pm1_p = glmmTMB(seed_production~species + site + (1|replicate), dat, family=poisson)
+pm2_p = glmmTMB(seed_production~species * site + (1|replicate), dat, family=poisson)
+nb0_p = glmmTMB(seed_production~species + (1|replicate), dat, family=nbinom2)
+nb1_p = glmmTMB(seed_production~species + site + (1|replicate), dat, family=nbinom2)
+nb2_p = glmmTMB(seed_production~species * site + (1|replicate), dat, family=nbinom2)
+zipm0_p = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=poisson)
+zipm0nb_p = glmmTMB(seed_production~species +(1|replicate), zi=~species, dat, family=nbinom2)
+zipm1nb_p = glmmTMB(seed_production~species + site +(1|replicate), zi=~species, dat, family=nbinom2)
+zipm2nb_p = glmmTMB(seed_production~species + site +(1|replicate), zi=~species + site, dat, family=nbinom2)
+
+aic_table3 <- bbmle::AICtab(pm0_p, pm1_p, pm2_p, 
+              nb0_p,nb1_p,nb2_p,
+              zipm0_p, 
+              zipm0nb_p, zipm1nb_p,zipm2nb_p)
+aic_table3
+```
+
