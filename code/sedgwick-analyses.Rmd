@@ -87,7 +87,7 @@ merged_df <- left_join(dat, env_dat)
 ```
 
 Let's do some exploratory plotting of seed production vs. environmental factors
-```{r plot-seedprod-v-env, eval = T}
+```{r plot-seedprod-v-env, eval = F}
 gg_seed <- ggplot(merged_df, aes(y = seed_production+1)) + 
   facet_wrap(~ species, ncol = 5) + scale_y_log10()
 
@@ -110,7 +110,7 @@ gg_seed + geom_point(aes(x = MDS2))
 
 And let's do a first pass on modeling seed production as a function of each environmental variable independently.
 
-```{r bunch-of-glmers, eval = T}
+```{r bunch-of-glmers, eval = F}
 glmer(data = merged_df, formula = seed_production~depth + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~Tmax + (1|species), family = poisson(link = log))
 glmer(data = merged_df, formula = seed_production~organic_matter_ENR + (1|species), family = poisson(link = log))
@@ -129,8 +129,16 @@ b <- glmer(data = merged_df, formula = seed_production~MDS2 + (1|species), famil
 An alternative (and I'm not sure at this stage which is the better approach to this problem) is to do a complete model.
 
 ```{r complete-glmer-model, eval = T}
-glmer(data = merged_df, formula = seed_production~depth+Tmax+organic_matter_ENR+pH+CEC_meq_100g+soil_moisture+
-        Nitrate_ppm + Mg_ppm + Ca_ppm + sand + NH4_N_ppm + MDS1 + MDS2 + (1|site), family = poisson)
+scale_this <- function(x) as.vector(scale(x))
+
+merged_df_s <- merged_df %>% mutate_at(c(9:21, 23), scale_this)
+aghe <- merged_df_s %>% filter(species == "AGHE")
+amme <- merged_df_s %>% filter(species == "AMME")
+a <- glmer(data = aghe, formula = seed_production ~ MDS1 + (1|replicate),
+           family = poisson,control = glmerControl(optimizer ="Nelder_Mead"))
+b <- glmer(data = amme, formula = seed_production ~ MDS1 + (1|replicate),
+           family = poisson,control = glmerControl(optimizer ="Nelder_Mead"))
+
 ```
 
 
@@ -235,3 +243,51 @@ aic_table3 <- bbmle::AICtab(pm0_p, pm1_p, pm2_p,
 aic_table3
 ```
 
+## Zero inflated with environmental predictors
+
+```{r}
+a <- glmmTMB(seed_production~MDS1+(seed_production|species), data = merged_df, family=nbinom2, zi=~species)
+b <- glmmTMB(seed_production~MDS1+(1|species), data = merged_df, family=nbinom2, zi=~species)
+c <- glmmTMB(seed_production~depth+Tmax+organic_matter_ENR+pH+CEC_meq_100g+soil_moisture+
+        Nitrate_ppm + Mg_ppm + Ca_ppm + sand + NH4_N_ppm + MDS1 + MDS2+(seed_production|species), 
+        data = merged_df, family=nbinom2, zi=~species)
+
+
+
+
+
+bbmle::AICtab(a,b,c)
+ranef(c)
+c
+newdata0 = newdata = unique(merged_df[,c("species", "MDS1")])
+temp = predict(a, merged_df)
+
+```
+
+## Time to do some linear models 
+
+
+```{r}
+
+slopes <- matrix(NA, nrow = length(unique(merged_df$species)), ncol = 15)
+rownames(slopes) = unique(merged_df$species)
+colnames(slopes) = colnames(merged_df)[c(9:21, 24, 25)]
+pvals <- slopes
+for(current_species in unique(merged_df$species)){
+  current_df <- merged_df_s %>% 
+    filter(species == !!current_species) %>% 
+    mutate(seed_production = scale(seed_production)) %>%
+    select(-microsite)
+  print(nrow(current_df))
+  
+  for (current_env in colnames(slopes)) {
+    sp <- current_df %>% select(seed_production) %>% unlist
+    env <- current_df %>% select(!!current_env) %>% unlist
+    ll <- lm(sp~env)
+    slopes[current_species, current_env] <- ll$coefficients[2]
+    pvals[current_species,current_env] <- anova(ll)$`Pr(>F)`[1]
+  }
+}
+
+knitr::kable(slopes)
+```

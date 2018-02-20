@@ -1,0 +1,109 @@
+---
+title: "Subsetting to just the non-zeros"
+author: "Gaurav Kandlikar"
+date: "February 16, 2018"
+output: md_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+thinkpad = T
+```
+
+Here I begin to recreate the dummy analyses presented in [this document](dummy-dataset-analysis.md)
+
+```{r}
+library(tidyverse); theme_set(theme_bw())
+library(lme4)
+library(vegan)
+library(glmmTMB)
+library(bbmle)
+```
+
+Let's import in the performance data and clean it up to our needs.
+
+```{r manage-performance-data}
+
+if(thinkpad){
+dat <- read_delim("../data/performance/seed_production_processed.csv", 
+col_names = T, delim = ",")
+} else {
+dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
+col_names = T, delim = ",")
+}
+
+dat <- dat %>% filter(plot_type == "L") %>% 
+  mutate(plot_num = paste0("plot_", plot_num),
+         replicate = as.factor(replicate),
+         num_seeds_produced = ifelse(is.na(num_seeds_produced), 0, num_seeds_produced)) %>%
+  rename(species = sp_code, seed_production = num_seeds_produced, site = plot_num) %>% select(-plot_type)
+
+datnz <- dat %>% filter(seed_production > 0)
+
+gg_raw_seed <- ggplot(datnz) + geom_boxplot(aes(site,seed_production)) + 
+facet_wrap(~species, ncol = 5) + scale_y_log10()
+gg_raw_seed
+
+gg_rawseed_hist <- ggplot(datnz) + geom_histogram(aes(seed_production))
+gg_rawseed_hist + scale_x_log10() + facet_wrap(~species, ncol = 5)# Note logged X-axis
+
+
+```
+
+Environmental data 
+
+```{r env-data}
+if(thinkpad){
+  env_dat <- read_delim("../data/environmental/all_environmental_data.csv", delim = ",")
+} else {
+  env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv",
+                        delim = ",") 
+}
+env_dat <- env_dat %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
+# skimr::skim(env_dat) %>% select(-missing, -complete, -n)
+
+# --------
+# NMDS
+
+# Subset the dataset to filter out some of the columns that are factors, or are repetitive...
+env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon, -Tmin, -ele) %>% 
+  as.data.frame %>% tibble::column_to_rownames("site") 
+soilmds <- metaMDS(env_dat_c)
+plot(soilmds)
+orditorp(soilmds, display="species", cex = 1.2)
+plot(soilmds)
+orditorp(soilmds, display="sites")
+
+# Merge in the MDS scores into the env_dat dataframe
+env_dat <- left_join(env_dat, soilmds$points %>% as.data.frame %>% tibble::rownames_to_column("site"))
+
+# Take a look at what the distribution looks like. 
+# skimr::skim(env_dat %>% select(MDS1, MDS2))
+# Merge in the environmental data with the performance-by-site data, for easier modeling later. 
+merged_df <- left_join(datnz, env_dat)
+```
+Now, the seed production responses are log-normally distributed
+```{r}
+gg_seed <- ggplot(merged_df, aes(y = seed_production)) + 
+  facet_wrap(~ species, ncol = 5) + scale_y_log10()
+
+gg_seed + geom_point(aes(x = depth))
+gg_seed + geom_point(aes(x = Tmax))
+gg_seed + geom_point(aes(x = organic_matter_ENR))
+gg_seed + geom_point(aes(x = pH))
+gg_seed + geom_point(aes(x = CEC_meq_100g))
+gg_seed + geom_point(aes(x = soil_moisture))
+gg_seed + geom_point(aes(x = Nitrate_ppm))
+gg_seed + geom_point(aes(x = Mg_ppm)) + scale_x_log10()
+gg_seed + geom_point(aes(x = Ca_ppm))+ scale_x_log10()
+gg_seed + geom_point(aes(x = sand))
+gg_seed + geom_point(aes(x = NH4_N_ppm))
+gg_seed + geom_point(aes(x = MDS1))
+gg_seed + geom_point(aes(x = MDS2))
+```
+```{r glmms}
+merged_df$lseed_production <- log10(merged_df$seed_production)
+merged_df2 <- merged_df %>% filter(lseed_production > 0)
+a <- glmer((seed_production)~MDS1+((seed_production)|species), 
+      data = merged_df, family = poisson)
+```
