@@ -7,7 +7,7 @@ output: md_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
-thinkpad = T
+thinkpad = F
 ```
 
 Here I begin to recreate the dummy analyses presented in [this document](dummy-dataset-analysis.md)
@@ -155,7 +155,7 @@ dat %>% head
 
 Remember from above that `seed_production` is count data and, based on the histogram, seems to have a zero-inflation problem. I will use the modeling functionality in the package **`glmmTMB`** to tackle this dataset. 
 
-```{r, eval = T}
+```{r, eval = F}
 # First, a poisson model with species and plot as fixed effect, replicate as random effect  
 
 # The zero-eth model just has a species effect and no site effect
@@ -179,7 +179,7 @@ aic_table <- bbmle::AICtab(pm0, pm1, pm2,
 aic_table
 ```
 According to the AIC table above it looks like the model `r attr(aic_table, "row.names")[1]` has the lowest AIC and therefore the most support in this framework. A good thing to check at this point is whether the same result holds if we *scale* the performance data (so that the per-species mean is 0 and the per-species SD = 1)
-```{r model-scaled-seedprod}
+```{r model-scaled-seedprod, eval = F}
 # Scale by species
 # Define a custom function to scale
 scale_this <- function(x) as.vector(scale(x))
@@ -212,7 +212,7 @@ aic_table2
 And for measure, let's also consider seed production as a *proportion*, i.e. where the seed performance for a species is equal to 1 at it's maximum seed performance
 
 
-```{r model-proportional-seedprod}
+```{r model-proportional-seedprod, eval = F}
 # Scale by species
 # Define a custom function to scale
 prop_this <- function(x) as.vector(x/(max(x, na.rm = T)))
@@ -245,7 +245,7 @@ aic_table3
 
 ## Zero inflated with environmental predictors
 
-```{r}
+```{r, eval = F}
 a <- glmmTMB(seed_production~MDS1+(seed_production|species), data = merged_df, family=nbinom2, zi=~species)
 b <- glmmTMB(seed_production~MDS1+(1|species), data = merged_df, family=nbinom2, zi=~species)
 c <- glmmTMB(seed_production~depth+Tmax+organic_matter_ENR+pH+CEC_meq_100g+soil_moisture+
@@ -274,20 +274,44 @@ rownames(slopes) = unique(merged_df$species)
 colnames(slopes) = colnames(merged_df)[c(9:21, 24, 25)]
 pvals <- slopes
 for(current_species in unique(merged_df$species)){
-  current_df <- merged_df_s %>% 
+  current_df <- merged_df %>% 
     filter(species == !!current_species) %>% 
     mutate(seed_production = scale(seed_production)) %>%
     select(-microsite)
-  print(nrow(current_df))
   
   for (current_env in colnames(slopes)) {
     sp <- current_df %>% select(seed_production) %>% unlist
-    env <- current_df %>% select(!!current_env) %>% unlist
+    env <- current_df %>% select(!!current_env) %>% unlist %>% scale
+    print(cbind(sp,env))
     ll <- lm(sp~env)
     slopes[current_species, current_env] <- ll$coefficients[2]
     pvals[current_species,current_env] <- anova(ll)$`Pr(>F)`[1]
   }
 }
 
+
 knitr::kable(slopes)
+
+
+apply(slopes, 1, function(x) which(x == max(x)))
+apply(abs(slopes), 1, function(x) which(x == max(x)))
+
+```
+
+
+Time to read in some traits
+
+```{r}
+traits <- read_delim("~/Dropbox/spatial_tapioca/data/trait/merged_sp_avg.csv", delim = ",") 
+traits <- traits %>% mutate(species = ifelse(species == "SACA", "SACO", species))
+traits <- traits %>% mutate(species = ifelse(species == "VUMA", "VUMI", species))
+
+traits <- traits %>% filter(species %in% unique(merged_df$species)) %>% arrange(species)
+
+slopes_t <- slopes %>% as.data.frame%>% tibble::rownames_to_column("species") %>% left_join(., traits)
+
+plot(slopes_t$soil_moisture ~ slopes_t$rooting_depth_mm)
+summary(lm(slopes_t$soil_moisture ~ slopes_t$rooting_depth_mm))
+
+
 ```
