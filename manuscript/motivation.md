@@ -35,7 +35,7 @@ Before getting too deep into the specifics of the data we have from Sedgwick, I 
   
 The contrasting scenarios are summarized neatly in their Table S1:  
 
-![](figs/laughlin-tabS1.png)
+![](figs/laughlin-tabs1.png)
 
 I'll come back to their methods in a bit, but for now I focus on their results and how they interpret things.
 
@@ -53,4 +53,20 @@ No trait exhibited independent main effects of survival because the adaptive val
 
 -----------------------------
 
-It's worth keeping this paper in mind as I think more about what I'm doing here. I will run the code in their supplement to get a better sense of what they're up to. 
+This paper is a really neat framing of part of what I'm hoping to do here- and I think I can do a neat analysis, even incorporating the ITV data I collected in 2017. Figure 1 from my dissertation proposal (see above) fits in neatly with Figure 1 of the Laughlin et al. paper- with the exception that I wasn't thinking about CWM traits during my proposal. An extention of this idea about the "adaptive value of traits" is that species "shift" their functional traits along environmental gradient in adaptive ways-- in other words, if there is predictable ITV along a gradient, then it ought to reflect the shifts in the adaptive value of the trait along the gradient. For instance, if species with high SLA respond positively to soil sand content, then we might expect individuals of a species growing in ghigher sand content to have higher SLA than individuals of the same spcies growing elsewhere. The following figure is an attempt at explaining this idea:  
+
+![](figs/hypothesis-w-itv.png)
+
+
+Of course, this figures represents the "rosiest" view of what's going on- it traits were perfectly adaptive, and if the signal came through in CWM traits, the first two panels would work out as drawn, and if ITV were perfectly adaptive, all species would display ITV as in the top panel. I suspect we are unlikely to find such a clean pattern- and more thinking will likely highlight a nuanced story. Piecing together all the possible combinations will take me some time- but one way to organize this would be to take Table S1 from Laughlin et al (as above), and in turn split the four quadrants up into three- representing the three different ITV options. 
+**To Do**: Break down the quadrants in Laughlin et al. into three further possibilities of ITV. 
+
+
+The nice thing about this framework is that the second two parts stand more or less independently of the first- there's interesting conclusions to be drawn from analysing the traitXenvironment drivers of vital rates, and asking whether ITV "tracks" the trait shifts you'd expect from the former. We can make a similar diagram, with "Trait X Environment effect on vital rate exists" on one axis, and "Traits shift in the same way as predicted", "Traits don't shift", and "Traits shift in opposite directions" as options on the other axis. 
+**To Do**: Make a two-by-three matrix of "tXe effects exist (or not)" by "itv exists (or not), and is in the direction expected (or not)
+
+------------------------------   
+
+
+  
+
