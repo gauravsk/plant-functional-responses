@@ -63,9 +63,19 @@ Of course, this figures represents the "rosiest" view of what's going on- it tra
 
 
 The nice thing about this framework is that the second two parts stand more or less independently of the first- there's interesting conclusions to be drawn from analysing the traitXenvironment drivers of vital rates, and asking whether ITV "tracks" the trait shifts you'd expect from the former. We can make a similar diagram, with "Trait X Environment effect on vital rate exists" on one axis, and "Traits shift in the same way as predicted", "Traits don't shift", and "Traits shift in opposite directions" as options on the other axis. 
-**To Do**: Make a two-by-three matrix of "tXe effects exist (or not)" by "itv exists (or not), and is in the direction expected (or not)
+**To Do**: Make a two-by-three matrix of "tXe effects exist (or not)" by "itv exists (or not), and is in the direction expected (or not)"
 
 ------------------------------   
+
+## Building good models.
+
+I've realized that the data we have is very non-normal, heterogeneous, may follow a negbin distribution, etc., and that my simple efforts at using sophisticated GLMMS (see `code/motivated_analyses.R` for my sandbox) are not quite sufficient. I'm going to seriously take up [Zuur's book on GLMMs for ecologists](https://link.springer.com/book/10.1007%2F978-0-387-87458-6) to get my facts right, because I think that the idea I'm developing is solid and a good analysis of it will make for a solid paper. 
+
+The basic motivation here is:  
+
+1. One of the fundamental assumptions of trait based functional ecology is that functional traits a) show general predictive relationships with environmental gradients because b) environments select on functional traits, such that species with the most adaptive traits are the fittest at a site.  
+2. A follow-up that we still don't quite understand is whether intraspecific trait variation (ITV) is generall adaptive, or whether it is random with respect to environment (especially environment alone- usually ITV in response to environment is confounded with ITV in response to competitors.).  
+3. Both of these are not very well tested. Here, we can test assumption 1a and 1b (especially 1b), and begin to assess assumption 2 for some traits (LDMC, SLA, SRL, plant height [although how much this is a 'trait' in an ITV context is unclear to me]).
 
 
   
