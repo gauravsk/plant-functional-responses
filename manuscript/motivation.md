@@ -75,7 +75,7 @@ The basic motivation here is:
 
 1. One of the fundamental assumptions of trait based functional ecology is that functional traits a) show general predictive relationships with environmental gradients because b) environments select on functional traits, such that species with the most adaptive traits are the fittest at a site.  
 2. A follow-up that we still don't quite understand is whether intraspecific trait variation (ITV) is generall adaptive, or whether it is random with respect to environment (especially environment alone- usually ITV in response to environment is confounded with ITV in response to competitors.).  
-3. Both of these are not very well tested. Here, we can test assumption 1a and 1b (especially 1b), and begin to assess assumption 2 for some traits (LDMC, SLA, SRL, plant height [although how much this is a 'trait' in an ITV context is unclear to me]).
+3. Both of these are not very well tested. Here, we can test assumption 1a and 1b (especially 1b) by testing whether species functional traits explain how their vital rates vary across environment, , and begin to assess assumption 2 for some traits (LDMC, SLA, SRL, plant height [although how much this is a 'trait' in an ITV context is unclear to me]).
 
 
   

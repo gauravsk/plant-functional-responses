@@ -19,7 +19,7 @@ library(lme4)
 library(vegan)
 library(glmmTMB)
 library(bbmle)
-thinkpad = TRUE
+thinkpad = F
 
 if(thinkpad){
   dat <- read_delim("data/performance/seed_production_processed.csv", 
@@ -28,13 +28,16 @@ if(thinkpad){
   dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
                     col_names = T, delim = ",")
 }
-focal_species <- c("PLER", "LACA", "HECO", "HOMU", "CEME", "AGHE", "LOWR", "AMME", "SACO", "CHGL")
+# focal_species <- c("PLER", "LACA", "HECO", "HOMU", "CEME", "AGHE", "LOWR", "AMME", "SACO", "CHGL")
 focal_species <- unique(dat$sp_code)
-
+focal_plots <- 740:755 # Toggle to select Candy Valley only
+min_seed <- 0
 dat <- dat %>% filter(plot_type == "L") %>% 
+  filter(plot_num %in% focal_plots) %>%
   mutate(plot_num = paste0("plot_", plot_num),
          replicate = as.factor(replicate),
          num_seeds_produced = ifelse(is.na(num_seeds_produced), 0, num_seeds_produced)) %>%
+  filter(num_seeds_produced >= min_seed) %>%
   rename(species = sp_code, seed_production = num_seeds_produced, site = plot_num) %>% 
   select(-plot_type) %>%
   filter(species %in% focal_species)
@@ -48,6 +51,13 @@ gg_raw_seed
 gg_rawseed_hist <- ggplot(dat) + geom_histogram(aes(seed_production + 1))
 gridExtra::grid.arrange(gg_rawseed_hist + ggtitle("Unlogged"), 
                         gg_rawseed_hist + scale_x_log10() + ggtitle("Logged"), ncol = 2) 
+
+# Print out the mean and the sd
+dat %>% select(site, replicate, species, seed_production) %>% 
+  tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
+dat %>% select(site, replicate, species, seed_production) %>% 
+  tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
+
 
 # And now we bring in the environmental data for each site
 if(thinkpad){
@@ -99,7 +109,12 @@ gg_sand <- ggdat + geom_point(aes(x = sand_scaled, y = seed_production+1), alpha
 gridExtra::grid.arrange(gg_camg,gg_nitrate, gg_sand, ncol = 3)
 
 # Now we merge in the species traits
-traits <- read_delim("data/trait/merged_sp_avg.csv", delim = ",") 
+if(thinkpad){
+  traits <- read_delim("data/trait/merged_sp_avg.csv", delim = ",")
+} else {
+  traits <- read_delim("~/Dropbox/spatial_tapioca/data/trait/merged_sp_avg.csv",
+                        delim = ",") 
+}
 traits <- traits %>% mutate(species = ifelse(species == "SACA", "SACO", species))
 traits <- traits %>% mutate(species = ifelse(species == "VUMA", "VUMI", species))
 
@@ -111,12 +126,28 @@ traits_sel <- traits %>% select(species, sla_cm2_g, max_height_cm, leaf_size_cm2
 
 dat <- left_join(dat, traits_sel)
 dat$seed_production_l <- log10(dat$seed_production+1)
-a <- glmmTMB(seed_production_l ~ sla_cm2_g + ca_mg_scaled + sla_cm2_g:ca_mg_scaled + (1|species), data = dat)
-b <- glmmTMB(seed_production_l ~ sla_cm2_g + sand_scaled + sla_cm2_g:sand_scaled + (1|species), data = dat)
-c <- glmmTMB(seed_production_l ~ sla_cm2_g + nitrate_ppm_scaled + sla_cm2_g:nitrate_ppm_scaled + (1|species), data = dat)
+a <- glmmTMB(seed_production ~ sla_cm2_g + ca_mg_scaled + sla_cm2_g:ca_mg_scaled + (1|species), data = dat)
+b <- glmmTMB(seed_production ~ sla_cm2_g + sand_scaled + sla_cm2_g:sand_scaled + (1|species), data = dat)
+c <- glmmTMB(seed_production ~ sla_cm2_g + nitrate_ppm_scaled + sla_cm2_g:nitrate_ppm_scaled + (1|species), data = dat)
 summary(a)
 summary(b)
 summary(c)
+
+a1 <- glmmTMB(seed_production_l ~ max_height_cm + ca_mg_scaled + max_height_cm:ca_mg_scaled + (1|species), data = dat)
+b1 <- glmmTMB(seed_production_l ~ max_height_cm + sand_scaled + max_height_cm:sand_scaled + (1|species), data = dat)
+c1 <- glmmTMB(seed_production_l ~ max_height_cm + nitrate_ppm_scaled + max_height_cm:nitrate_ppm_scaled + (1|species), data = dat)
+summary(a1)
+summary(b1)
+summary(c1)
+
+a2 <- glmmTMB(seed_production_l ~ ca_mg_scaled +  (1|species), data = dat)
+b2 <- glmmTMB(seed_production_l ~ sand_scaled + (1|species), data = dat)
+c2 <- glmmTMB(seed_production_l ~  nitrate_ppm_scaled + (1|species), data = dat)
+summary(a2)
+summary(b2)
+summary(c2)
+
+
 anova(a)
 dat2 <- dat %>% filter(seed_production > 0)
 
