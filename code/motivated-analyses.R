@@ -21,6 +21,7 @@ library(glmmTMB)
 library(bbmle)
 thinkpad = F
 
+# Bring in seed production data ------------
 if(thinkpad){
   dat <- read_delim("data/performance/seed_production_processed.csv", 
                     col_names = T, delim = ",")
@@ -30,7 +31,8 @@ if(thinkpad){
 }
 # focal_species <- c("PLER", "LACA", "HECO", "HOMU", "CEME", "AGHE", "LOWR", "AMME", "SACO", "CHGL")
 focal_species <- unique(dat$sp_code)
-focal_plots <- 740:755 # Toggle to select Candy Valley only
+# focal_plots <- 740:755 # Toggle to select Candy Valley only
+focal_plots <- 740:763
 min_seed <- 0
 dat <- dat %>% filter(plot_type == "L") %>% 
   filter(plot_num %in% focal_plots) %>%
@@ -59,7 +61,7 @@ dat %>% select(site, replicate, species, seed_production) %>%
   tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
 
 
-# And now we bring in the environmental data for each site
+# And now we bring in the environmental data for each site -----------
 if(thinkpad){
   env_dat <- read_delim("data/environmental/all_environmental_data.csv", delim = ",")
 } else {
@@ -108,7 +110,7 @@ gg_sand <- ggdat + geom_point(aes(x = sand_scaled, y = seed_production+1), alpha
 
 gridExtra::grid.arrange(gg_camg,gg_nitrate, gg_sand, ncol = 3)
 
-# Now we merge in the species traits
+# Now we merge in the species traits ----------
 if(thinkpad){
   traits <- read_delim("data/trait/merged_sp_avg.csv", delim = ",")
 } else {
@@ -125,38 +127,55 @@ traits_sel <- traits %>% select(species, sla_cm2_g, max_height_cm, leaf_size_cm2
   filter(species %in% unique(dat$species))
 
 dat <- left_join(dat, traits_sel)
+
+
+# Do some more data prep ------------
+# Make a new column seed_production_l that has log-transformed seed production
 dat$seed_production_l <- log10(dat$seed_production+1)
-a <- glmmTMB(seed_production ~ sla_cm2_g + ca_mg_scaled + sla_cm2_g:ca_mg_scaled + (1|species), data = dat)
-b <- glmmTMB(seed_production ~ sla_cm2_g + sand_scaled + sla_cm2_g:sand_scaled + (1|species), data = dat)
-c <- glmmTMB(seed_production ~ sla_cm2_g + nitrate_ppm_scaled + sla_cm2_g:nitrate_ppm_scaled + (1|species), data = dat)
-summary(a)
-summary(b)
-summary(c)
 
-a1 <- glmmTMB(seed_production_l ~ max_height_cm + ca_mg_scaled + max_height_cm:ca_mg_scaled + (1|species), data = dat)
-b1 <- glmmTMB(seed_production_l ~ max_height_cm + sand_scaled + max_height_cm:sand_scaled + (1|species), data = dat)
-c1 <- glmmTMB(seed_production_l ~ max_height_cm + nitrate_ppm_scaled + max_height_cm:nitrate_ppm_scaled + (1|species), data = dat)
-summary(a1)
-summary(b1)
-summary(c1)
-
-a2 <- glmmTMB(seed_production_l ~ ca_mg_scaled +  (1|species), data = dat)
-b2 <- glmmTMB(seed_production_l ~ sand_scaled + (1|species), data = dat)
-c2 <- glmmTMB(seed_production_l ~  nitrate_ppm_scaled + (1|species), data = dat)
-summary(a2)
-summary(b2)
-summary(c2)
-
-
-anova(a)
-dat2 <- dat %>% filter(seed_production > 0)
-
-# Let's scale the seed production per species
-dat_s <- dat %>% select(site, replicate, species, seed_production) %>% tidyr::spread(species, seed_production) %>% 
+# Make a column seed_production_scaled that includes seed production, scaled per species
+scale_this <- function(x) as.vector(scale(x))
+dat <- dat %>% select(site, replicate, species, seed_production) %>% tidyr::spread(species, seed_production) %>% 
   mutate_if(is.numeric, scale_this) %>% 
   unite(id, c("site", "replicate"), sep = "XX") %>%
   tidyr::gather("species", "seed_production",2:18) %>% 
   separate(id, c("site", "replicate"), sep = "XX") %>% 
-  left_join(., dat, by = c('site', 'species', 'replicate')) %>% select(-seed_production.y) %>% rename(seed_production = seed_production.x)
+  left_join(., dat, by = c('site', 'species', 'replicate')) %>% rename(seed_production = seed_production.y,
+                                                                       seed_production_scaled  = seed_production.x)
 
-summary(a1)
+
+
+
+
+
+
+# Run some models --------------
+fit_zipoisson <- glmmTMB(seed_production~ca_mg_scaled + nitrate_ppm_scaled + sand_scaled + sla_cm2_g + 
+                           sla_cm2_g*ca_mg_scaled + sla_cm2_g*nitrate_ppm_scaled + sla_cm2_g*sand_scaled + 
+                           (seed_production|species) + (1|site),
+                         ziformula = ~1, family = poisson, data = dat)
+
+fit_zipoisson2 <- update(fit_zipoisson, ziformula = ~ species)
+fit_nbinom <- update(fit_zipoisson2, family = nbinom2)
+# fit_nbinom2 <- update(fit_nbinom, family = nbinom1) # This model has a non-positive-definite Hessian matrix and so is excluded
+
+AICtab(fit_zipoisson, fit_zipoisson2, fit_nbinom)
+
+# We try a hurdle-model, using fit_nbinom as the starting point since it had the lowest AIC
+
+# fit_hnbinom1 <-  update(fit_nbinom,
+#                         ziformula=~.,
+#                         family=list(family="truncated_nbinom1",link="log"))
+# But we exclude it as well, since it has a non-positive-definite Hessian matrix
+
+# AICtab still suggests fit_nbinom as the optimal, but I want to leave out the terms
+
+AICtab(fit_zipoisson, fit_zipoisson2, fit_nbinom, fit_nbinom_norandoms, fit_nbinom_notrait, fit_nbinom_nocamg)
+
+# What if we go back and add in terms one by one
+fit_nbinom_camgOnly <- glmmTMB(seed_production ~ ca_mg_scaled, family = nbinom2, data = dat)
+fit_nbinom_nitrateOnly <- glmmTMB(seed_production ~ nitrate_ppm_scaled, family = nbinom2, data = dat)
+fit_nbinom_sandOnly <- glmmTMB(seed_production ~ sand_scaled, family = nbinom2, data = dat)
+
+AICtab(fit_zipoisson, fit_zipoisson2, fit_nbinom, fit_nbinom_norandoms, fit_nbinom_notrait, fit_nbinom_nocamg,
+       fit_nbinom_sandOnly, fit_nbinom_nitrateOnly, fit_nbinom_camgOnly)

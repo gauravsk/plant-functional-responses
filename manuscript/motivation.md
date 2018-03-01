@@ -78,5 +78,16 @@ The basic motivation here is:
 3. Both of these are not very well tested. Here, we can test assumption 1a and 1b (especially 1b) by testing whether species functional traits explain how their vital rates vary across environment, , and begin to assess assumption 2 for some traits (LDMC, SLA, SRL, plant height [although how much this is a 'trait' in an ITV context is unclear to me]).
 
 
+Given that I have (I think) a pretty solid conceptual basis, my main task right now is to figure out the best way to deal with the high dimensionality of the dataset, etc. So, I will (maybe "yet again") summarize here the data available to me:   
+
+1. The demography of 17 species at 24 sites ("demography" here means i) germination rate; ii) seed production in the absence of competitors; iii) seed production in the presence of competitors)  
+2. Trait data on all species (I will focus on SLA, leaf size, SRL, Max Height, Flowering Phenology, and seed mass). I have species means measured in a single site, and also have site-specific measurements of SLA, leaf size, and SRL.  
+3. Environmental data from each site- the primary axes of abiotic variation are soil Ca:Mg ratio, soil nitrate concentration, and soil sand content. The biotic environment at each site is captured by an NMDS on the bacterial, fungal, and small eukaryotes. 
+
+### Finalizing the demography dataset  
+
+A major challenge for me right now is that the demography is a little bit all over the place. One strategy might be to focus on running the ML demography models and just work with the central tendencies of the parameter estimates- in other words, to run the ML models and end up with three tables: i) sp X site for lambda seed production; ii) sp X site for germination rate; iii) sp X site for sensitivity to competition. 
+
+Since I ought to be pretty close to having this finalized, I will focus on that now, in the doc `ml_estimates_of_demography.Rmd`
   
 
