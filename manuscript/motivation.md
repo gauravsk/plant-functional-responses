@@ -8,9 +8,9 @@ The third question will explore whether species functional traits help explain v
 
 ----------------------------
   
-  ## 22 Feb 2018- more thinking about the motivation
-  
-  Since there's a ton of dimensionality to these models, and since I'm getting a little distracted by just running various models, I'm taking yet another step back and jotting down some thoughts on the aims, modeling approaches, potential ways to focus our analyses and simplify the data set, and limitations of the data set. To do this it's worth going back to the motivations for this study. 
+## 22 Feb 2018- more thinking about the motivation
+
+Since there's a ton of dimensionality to these models, and since I'm getting a little distracted by just running various models, I'm taking yet another step back and jotting down some thoughts on the aims, modeling approaches, potential ways to focus our analyses and simplify the data set, and limitations of the data set. To do this it's worth going back to the motivations for this study. 
 
 ## Motivation in functional trait ecology  
 [Shipley et al. 2016](https://link.springer.com/article/10.1007/s00442-016-3549-x) note that a "Foundational claim" of the functional trait paradigm is that "Functional traits show general predictive relationships to measurable environmental gradients." In other words, similar environmental conditions should tend to select for a similar distribution of traits (of "response traits"). This prediction is frequently borne out by observational studies that find shifts in community-weighted mean trait values along gradients- for example, Nathan's 2008 Science paper showed turnover in functional traits within Yasuni in ways that "made sense" given the abiotic environmental variation. But on the whole, we lack generalizable relationships that underlie such patterns- for example, although 'more fertile' soils are predicted to be dominated by species with 'resource-acquisitive' traits, it's unclear how this breaks down demographically. And it's important to get this right- because ecologists have, in the past, predicted (assumed?) that community-weighted mean traits signify the adaptive value of traits at an environment, and extend this to make predictions about the performance of species along environmental gradients (e.g. "species with traits matching the CWM trait of a site will perform well at that site, if they manage to disperse in".) As I wrote in my quals proposal, this can set us up with a few competing hypotheses:  
@@ -90,4 +90,3 @@ A major challenge for me right now is that the demography is a little bit all ov
 
 Since I ought to be pretty close to having this finalized, I will focus on that now, in the doc `ml_estimates_of_demography.Rmd`
   
-

@@ -378,7 +378,7 @@ for(sp in unique(seedprod$sp_code)) {
   # and 3:26 are the site-specific lambda estimates
   # Model 5 expects parameters in the order c(sigma, alphas*24, lambdas*24)
   par <- c(testcomp4$par[2], rep(testcomp4$par[1], 24), testcomp4$par[3:26])
-  for(i in 1:100){
+  for(i in 1:200){
     testcomp5<-optim(par,compmodel5,  method="L-BFGS-B", lower=c(0.0000001, rep(0.0000000001, 24), rep(1, 24)),
                      control=list(maxit=10000), hessian=TRUE)
     par<-testcomp5$par
@@ -390,14 +390,34 @@ for(sp in unique(seedprod$sp_code)) {
   pars_to_save[set_to_na+25] <- NA
 
   mod5pars[sp,] <- c(pars_to_save, testcomp5$convergence)
-}
+  
+  # Plot the seed production
+  # Make a vector of the predicted seed output- this is kind of tricky given the spatial goings on
+  # Predicted seed output should be (Lambda_for_plot)/(1+alpha_for_plot*plot_density)
+  # but we need things to repeat the right number of times...
+  
+  lambdas_per_site <- rep(mod5pars[sp, 26:49], colSums(site_matrix))
+  alphas_per_site <- rep(mod5pars[sp, 2:25], colSums(site_matrix))
+  
+  pred_lseed <- c(as.matrix(lambdas_per_site*site_matrix)/
+                    (1+alphas_per_site*compdens))[c(as.matrix(lambdas_per_site*site_matrix)/(1+alphas_per_site*compdens)) > 0]
+  plot(x = lseed, y =pred_lseed)
+  }
+
+# Save the outputs ===========
+# NOTE! Double check these outputs. Why are the convergence codes 1 now???
+# write.csv(mod1pars, "model_outputs/mod1pars.csv")
+# write.csv(mod2pars, "model_outputs/mod2pars.csv")
+# write.csv(mod3pars, "model_outputs/mod3pars.csv")
+# write.csv(mod4pars, "model_outputs/mod4pars.csv")
+# write.csv(mod5pars, "model_outputs/mod5pars.csv")
 ```
 
-### To Do: 
+## To Do
 
 Here's some things that are yet to be done:   
 
  - [ ] Figure out exactly how to use the Hessian that is produced from testcomps3,4,5. I have a vague understanding that the square root of the diagonals of the inverse of the matrix represent the standard error of the ML estimate.   
  - [ ] Add code to plot the observed seed output vs. the seed output expected from the models  
  - [ ] Compare the output from these models with a second analysis, of estimating all of these parameters from a call to `lmer` with `species*site*competitor density` as the predictor.
- - [ ] Up the max replicates of model 5 from 100 to 200, to see if the few remaining species that don't converge eventually do (maybe this doesn't matter in the end, can't hurt to try.)  
+ - [x] Up the max replicates of model 5 from 100 to 200, to see if the few remaining species that don't converge eventually do (maybe this doesn't matter in the end, can't hurt to try.)  
