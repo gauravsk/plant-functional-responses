@@ -8,9 +8,9 @@ The third question will explore whether species functional traits help explain v
 
 ----------------------------
   
-  ## 22 Feb 2018- more thinking about the motivation
-  
-  Since there's a ton of dimensionality to these models, and since I'm getting a little distracted by just running various models, I'm taking yet another step back and jotting down some thoughts on the aims, modeling approaches, potential ways to focus our analyses and simplify the data set, and limitations of the data set. To do this it's worth going back to the motivations for this study. 
+## 22 Feb 2018- more thinking about the motivation
+
+Since there's a ton of dimensionality to these models, and since I'm getting a little distracted by just running various models, I'm taking yet another step back and jotting down some thoughts on the aims, modeling approaches, potential ways to focus our analyses and simplify the data set, and limitations of the data set. To do this it's worth going back to the motivations for this study. 
 
 ## Motivation in functional trait ecology  
 [Shipley et al. 2016](https://link.springer.com/article/10.1007/s00442-016-3549-x) note that a "Foundational claim" of the functional trait paradigm is that "Functional traits show general predictive relationships to measurable environmental gradients." In other words, similar environmental conditions should tend to select for a similar distribution of traits (of "response traits"). This prediction is frequently borne out by observational studies that find shifts in community-weighted mean trait values along gradients- for example, Nathan's 2008 Science paper showed turnover in functional traits within Yasuni in ways that "made sense" given the abiotic environmental variation. But on the whole, we lack generalizable relationships that underlie such patterns- for example, although 'more fertile' soils are predicted to be dominated by species with 'resource-acquisitive' traits, it's unclear how this breaks down demographically. And it's important to get this right- because ecologists have, in the past, predicted (assumed?) that community-weighted mean traits signify the adaptive value of traits at an environment, and extend this to make predictions about the performance of species along environmental gradients (e.g. "species with traits matching the CWM trait of a site will perform well at that site, if they manage to disperse in".) As I wrote in my quals proposal, this can set us up with a few competing hypotheses:  
@@ -63,10 +63,30 @@ Of course, this figures represents the "rosiest" view of what's going on- it tra
 
 
 The nice thing about this framework is that the second two parts stand more or less independently of the first- there's interesting conclusions to be drawn from analysing the traitXenvironment drivers of vital rates, and asking whether ITV "tracks" the trait shifts you'd expect from the former. We can make a similar diagram, with "Trait X Environment effect on vital rate exists" on one axis, and "Traits shift in the same way as predicted", "Traits don't shift", and "Traits shift in opposite directions" as options on the other axis. 
-**To Do**: Make a two-by-three matrix of "tXe effects exist (or not)" by "itv exists (or not), and is in the direction expected (or not)
+**To Do**: Make a two-by-three matrix of "tXe effects exist (or not)" by "itv exists (or not), and is in the direction expected (or not)"
 
 ------------------------------   
 
+## Building good models.
 
+I've realized that the data we have is very non-normal, heterogeneous, may follow a negbin distribution, etc., and that my simple efforts at using sophisticated GLMMS (see `code/motivated_analyses.R` for my sandbox) are not quite sufficient. I'm going to seriously take up [Zuur's book on GLMMs for ecologists](https://link.springer.com/book/10.1007%2F978-0-387-87458-6) to get my facts right, because I think that the idea I'm developing is solid and a good analysis of it will make for a solid paper. 
+
+The basic motivation here is:  
+
+1. One of the fundamental assumptions of trait based functional ecology is that functional traits a) show general predictive relationships with environmental gradients because b) environments select on functional traits, such that species with the most adaptive traits are the fittest at a site.  
+2. A follow-up that we still don't quite understand is whether intraspecific trait variation (ITV) is generall adaptive, or whether it is random with respect to environment (especially environment alone- usually ITV in response to environment is confounded with ITV in response to competitors.).  
+3. Both of these are not very well tested. Here, we can test assumption 1a and 1b (especially 1b) by testing whether species functional traits explain how their vital rates vary across environment, , and begin to assess assumption 2 for some traits (LDMC, SLA, SRL, plant height [although how much this is a 'trait' in an ITV context is unclear to me]).
+
+
+Given that I have (I think) a pretty solid conceptual basis, my main task right now is to figure out the best way to deal with the high dimensionality of the dataset, etc. So, I will (maybe "yet again") summarize here the data available to me:   
+
+1. The demography of 17 species at 24 sites ("demography" here means i) germination rate; ii) seed production in the absence of competitors; iii) seed production in the presence of competitors)  
+2. Trait data on all species (I will focus on SLA, leaf size, SRL, Max Height, Flowering Phenology, and seed mass). I have species means measured in a single site, and also have site-specific measurements of SLA, leaf size, and SRL.  
+3. Environmental data from each site- the primary axes of abiotic variation are soil Ca:Mg ratio, soil nitrate concentration, and soil sand content. The biotic environment at each site is captured by an NMDS on the bacterial, fungal, and small eukaryotes. 
+
+### Finalizing the demography dataset  
+
+A major challenge for me right now is that the demography is a little bit all over the place. One strategy might be to focus on running the ML demography models and just work with the central tendencies of the parameter estimates- in other words, to run the ML models and end up with three tables: i) sp X site for lambda seed production; ii) sp X site for germination rate; iii) sp X site for sensitivity to competition. 
+
+Since I ought to be pretty close to having this finalized, I will focus on that now, in the doc `ml_estimates_of_demography.Rmd`
   
-

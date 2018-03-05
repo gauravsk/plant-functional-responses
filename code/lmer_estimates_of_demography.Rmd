@@ -1,0 +1,50 @@
+---
+title: "lmer estimates of demographic parameters"
+author: "Gaurav Kandlikar"
+date: "March 2, 2018"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+An alternative to running a bunch of ML models that get fit by optim() might be to run the data through a lmer() model in which seed production is modeled as a function of the interaction between species, site, and competitor density.  We can also run simpler models in which seedproduction is modeled just as a function of species, or just as a function of site, or just as a function of competitor. With this array of models we can then run AIC to pic the best one. 
+
+### First we read in the data 
+
+```{r import-data}
+
+library(dplyr)
+compdens <- read.csv("~/Dropbox/spatial_tapioca/data/performance/calculated/NCompetitors_per_plot.csv")
+seedprod <- read.csv("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", stringsAsFactors = F)
+# replace 0s with NAs...
+seedprod[which(seedprod$num_seeds_produced == 0), "num_seeds_produced"] <- NA
+# maybe switch to be the minimum for the species?
+seedprod <- na.omit(seedprod)
+seedprod$sp_code <- as.character(seedprod$sp_code)
+seedprod$sp_code[which(seedprod$sp_code=="AGSP")] <- "AGHE"
+seedprod$sp_code[which(seedprod$sp_code=="CEMI")] <- "CEME"
+seedprod$sp_code[which(seedprod$sp_code=="VUMI")] <- "VUMA"
+
+compdens <- dplyr::select(compdens, -N_per_compPlot)
+compdens$N_per_neighborhood <- floor(compdens$N_per_neighborhood)
+seedprod <- left_join(seedprod, compdens)
+# Reset the competitor density in Lambda plots to 0
+seedprod[which(seedprod$plot_type == "L"), "N_per_neighborhood"] <- 0
+
+seedprod <- seedprod %>% mutate(num_seeds_produced = as.integer(num_seeds_produced),
+                    N_per_neighborhood = as.integer(N_per_neighborhood))
+
+seedprod
+
+library(lme4)
+sp_only <- lmer(num_seeds_produced~sp_code+ (1|replicate), data = seedprod )
+sp_by_site <- lmer(num_seeds_produced~sp_code+ plot_num + sp_code*plot_num + (1|replicate), data = seedprod )
+sp_by_site_by_comp <- lmer(num_seeds_produced~sp_code+plot_num+sp_code*plot_num*N_per_neighborhood + (1|replicate), data = seedprod )
+interactions_only <- lmer(num_seeds_produced ~ sp_code*plot_num*N_per_neighborhood + (1|replicate), data = seedprod )
+summary(sp_only)
+summary(sp_by_site)
+summary(sp_by_site_by_comp)
+summary(interactions_only)
+```

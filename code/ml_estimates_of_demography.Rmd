@@ -1,0 +1,423 @@
+---
+title: "ML estimates of demographic parameters"
+author: "Gaurav Kandlikar"
+date: "February 28, 2018"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Set up competition models
+First we set up the models, as motived by JHRL.
+
+### Model 1: No effect of competitors on seed production
+```{r comp-model-1}
+compmodel1 <- function(par) {
+  mu = par[1] 
+  sigma = par[2]
+  pred = mu # The predicted seed output is just the mean
+  llik = dnorm(lseed, log(pred), sd = sigma, log = TRUE)
+  return(sum(-1*llik))
+}
+```
+
+### Model 2: A global lambda, that decreases due to competition with neighbors
+```{r comp-model-2}
+# write a new model that has a global alpha and a global lambda
+compmodel2<-function(par){
+  lambda<-par[1]
+  alpha<-par[2]
+  sigma<-par[3]
+  pred<-lambda/(1+alpha*(dens)) #this is the predictive model
+  llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
+  return(sum(-1*llik)) #sum of negative log likelihoods
+}
+```
+
+### Model 3: Global alpha; Global lambda that gets modified by a site-specific coefficient
+```{r comp-model-3}
+# write a new model that has a global alpha and a global lambda that is additively modified by a site-term
+compmodel3<-function(par){
+  lambda <- par[1]
+  alpha  <- par[2]
+  sigma  <- par[3]
+  site1  <- par[4]
+  site2  <- par[5] 
+  site3  <- par[6] 
+  site4  <- par[7] 
+  site5  <- par[8] 
+  site6  <- par[9] 
+  site7  <- par[10] 
+  site8  <- par[11] 
+  site9  <- par[12]
+  site10 <- par[13] 
+  site11 <- par[14] 
+  site12 <- par[15] 
+  site13 <- par[16] 
+  site14 <- par[17] 
+  site15 <- par[18] 
+  site16 <- par[19] 
+  site17 <- par[20] 
+  site18 <- par[21] 
+  site19 <- par[22] 
+  site20 <- par[23] 
+  site21 <- par[24] 
+  site22 <- par[25] 
+  site23 <- par[26] 
+  site24 <- par[27] 
+  pred<-(lambda + site1*site_matrix[, 1]+ site2*site_matrix[, 2] + site3*site_matrix[, 3] + site4*site_matrix[, 4] + site5*site_matrix[, 5] + site6*site_matrix[, 6] + site7*site_matrix[, 7] + site8*site_matrix[, 8] + site9*site_matrix[, 9] + site10*site_matrix[, 10] + site11*site_matrix[, 11] + site12*site_matrix[, 12] + site13*site_matrix[, 13] + site14*site_matrix[, 14] + site15*site_matrix[, 15] + site16*site_matrix[, 16] + site17*site_matrix[, 17] + site18*site_matrix[, 18] + site19*site_matrix[, 19] + site20*site_matrix[, 20] + site21*site_matrix[, 21] + site22*site_matrix[, 22] + site23*site_matrix[, 23] + site24*site_matrix[, 24])/(1+alpha*(dens)) #this is the predictive model
+  llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
+  return(sum(-1*llik)) #sum of negative log likelihoods
+}
+```
+
+### Model 4: Global alpha; 24 site-specific lambda terms per species
+```{r comp-model-4}
+# write a new model that has a global alpha and 24 site-specific lambda terms per species
+compmodel4<-function(par){
+  alpha  <- par[1]
+  sigma  <- par[2]
+  site1  <- par[3]
+  site2  <- par[4] 
+  site3  <- par[5] 
+  site4  <- par[6] 
+  site5  <- par[7] 
+  site6  <- par[8] 
+  site7  <- par[9] 
+  site8  <- par[10] 
+  site9  <- par[11]
+  site10 <- par[12] 
+  site11 <- par[13] 
+  site12 <- par[14] 
+  site13 <- par[15] 
+  site14 <- par[16] 
+  site15 <- par[17] 
+  site16 <- par[18] 
+  site17 <- par[19] 
+  site18 <- par[20] 
+  site19 <- par[21] 
+  site20 <- par[22] 
+  site21 <- par[23] 
+  site22 <- par[24] 
+  site23 <- par[25] 
+  site24 <- par[26] 
+  pred<-(site1*site_matrix[, 1]+ site2*site_matrix[, 2] + site3*site_matrix[, 3] + site4*site_matrix[, 4] + site5*site_matrix[, 5] + site6*site_matrix[, 6] + site7*site_matrix[, 7] + site8*site_matrix[, 8] + site9*site_matrix[, 9] + site10*site_matrix[, 10] + site11*site_matrix[, 11] + site12*site_matrix[, 12] + site13*site_matrix[, 13] + site14*site_matrix[, 14] + site15*site_matrix[, 15] + site16*site_matrix[, 16] + site17*site_matrix[, 17] + site18*site_matrix[, 18] + site19*site_matrix[, 19] + site20*site_matrix[, 20] + site21*site_matrix[, 21] + site22*site_matrix[, 22] + site23*site_matrix[, 23] + site24*site_matrix[, 24])/(1+alpha*(dens)) #this is the predictive model
+  llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
+  return(sum(-1*llik)) #sum of negative log likelihoods
+}
+
+
+```
+
+
+### Model 5: 24 site-specific lambda terms and 24 site-specific alpha terms per species
+```{r comp-model-5}
+compmodel5<-function(par){
+  # The sigma is still global
+  sigma  <- par[1]
+
+  # Site specific alphas 
+  alpha1  <- par[2]
+  alpha2  <- par[3] 
+  alpha3  <- par[4] 
+  alpha4  <- par[5] 
+  alpha5  <- par[6] 
+  alpha6  <- par[7] 
+  alpha7  <- par[8] 
+  alpha8  <- par[9] 
+  alpha9  <- par[10]
+  alpha10 <- par[11] 
+  alpha11 <- par[12] 
+  alpha12 <- par[13] 
+  alpha13 <- par[14] 
+  alpha14 <- par[15] 
+  alpha15 <- par[16] 
+  alpha16 <- par[17] 
+  alpha17 <- par[18] 
+  alpha18 <- par[19] 
+  alpha19 <- par[20] 
+  alpha20 <- par[21] 
+  alpha21 <- par[22] 
+  alpha22 <- par[23] 
+  alpha23 <- par[24] 
+  alpha24 <- par[25] 
+  
+  # Site specific lambas 
+  site1 <- par[25]
+  site2 <- par[26]
+  site3 <- par[27]
+  site4 <- par[28]
+  site5 <- par[29]
+  site6 <- par[30]
+  site7 <- par[31]
+  site8 <- par[32]
+  site9 <- par[33]
+  site10 <- par[34]
+  site11 <- par[35]
+  site12 <- par[36]
+  site13 <- par[37]
+  site14 <- par[38]
+  site15 <- par[39]
+  site16 <- par[40]
+  site17 <- par[41]
+  site18 <- par[42]
+  site19 <- par[43]
+  site20 <- par[44]
+  site21 <- par[45]
+  site22 <- par[46]
+  site23 <- par[47]
+  site24 <- par[48]
+  
+  
+  # Predictive model
+
+  pred<-(site1*site_matrix[, 1]+ site2*site_matrix[, 2] + site3*site_matrix[, 3] + site4*site_matrix[, 4] + 
+           site5*site_matrix[, 5] + site6*site_matrix[, 6] + site7*site_matrix[, 7] + site8*site_matrix[, 8] + 
+           site9*site_matrix[, 9] + site10*site_matrix[, 10] + site11*site_matrix[, 11] + site12*site_matrix[, 12] + 
+           site13*site_matrix[, 13] + site14*site_matrix[, 14] + site15*site_matrix[, 15] + site16*site_matrix[, 16] + 
+           site17*site_matrix[, 17] + site18*site_matrix[, 18] + site19*site_matrix[, 19] + site20*site_matrix[, 20] + 
+           site21*site_matrix[, 21] + site22*site_matrix[, 22] + site23*site_matrix[, 23] + site24*site_matrix[, 24]) /
+    (1+ alpha1*compdens[, 1]+ alpha2*compdens[, 2] + alpha3*compdens[, 3] + alpha4*compdens[, 4] + 
+       alpha5*compdens[, 5] + alpha6*compdens[, 6] + alpha7*compdens[, 7] + alpha8*compdens[, 8] + 
+       alpha9*compdens[, 9] + alpha10*compdens[, 10] + alpha11*compdens[, 11] + alpha12*compdens[, 12] + 
+       alpha13*compdens[, 13] + alpha14*compdens[, 14] + alpha15*compdens[, 15] + alpha16*compdens[, 16] + 
+       alpha17*compdens[, 17] + alpha18*compdens[, 18] + alpha19*compdens[, 19] + alpha20*compdens[, 20] + 
+       alpha21*compdens[, 21] + alpha22*compdens[, 22] + alpha23*compdens[, 23] + alpha24*compdens[, 24]) #this is the predictive model
+  llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
+  return(sum(-1*llik)) #sum of negative log likelihoods
+}
+
+```
+
+## Read in data, munge, and run the ML models.
+
+```{r import-data}
+library(dplyr)
+compdens <- read.csv("~/Dropbox/spatial_tapioca/data/performance/calculated/NCompetitors_per_plot.csv")
+seedprod <- read.csv("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", stringsAsFactors = F)
+# replace 0s with NAs...
+seedprod[which(seedprod$num_seeds_produced == 0), "num_seeds_produced"] <- NA
+# maybe switch to be the minimum for the species?
+seedprod <- na.omit(seedprod)
+seedprod$sp_code <- as.character(seedprod$sp_code)
+seedprod$sp_code[which(seedprod$sp_code=="AGSP")] <- "AGHE"
+seedprod$sp_code[which(seedprod$sp_code=="CEMI")] <- "CEME"
+seedprod$sp_code[which(seedprod$sp_code=="VUMI")] <- "VUMA"
+
+compdens <- dplyr::select(compdens, -N_per_compPlot)
+compdens$N_per_neighborhood <- floor(compdens$N_per_neighborhood)
+seedprod <- left_join(seedprod, compdens)
+# Reset the competitor density in Lambda plots to 0
+seedprod[which(seedprod$plot_type == "L"), "N_per_neighborhood"] <- 0
+
+seedprod <- seedprod %>% mutate(num_seeds_produced = as.integer(num_seeds_produced),
+                    N_per_neighborhood = as.integer(N_per_neighborhood))
+
+
+# Fit the four models to just AGHE right now
+# Later we loop over all the species in the dataset
+
+# Set up empty matrices to be filled during the for-loop --------------
+
+# Model 1
+mod1pars <- matrix(NA, ncol = 3, nrow = length(unique(seedprod$sp_code)))
+rownames(mod1pars) <- unique(seedprod$sp_code)
+colnames(mod1pars) <- c("lambda", "sigma", "convergence_code")
+
+# Model 2
+mod2pars <- matrix(NA, ncol = 4, nrow = length(unique(seedprod$sp_code)))
+rownames(mod2pars) <- unique(seedprod$sp_code)
+colnames(mod2pars) <- c("lambda", "alpha", "sigma", "convergence_code")
+
+# Model 3
+mod3pars <- matrix(NA, ncol = 28, nrow = length(unique(seedprod$sp_code)))
+rownames(mod3pars) <- unique(seedprod$sp_code)
+colnames(mod3pars) <- c("lambda", "alpha", "sigma", paste0("plot_",740:763, "_effect"), "convergence_code")
+
+# Model 4
+mod4pars <- matrix(NA, ncol = 27, nrow = length(unique(seedprod$sp_code)))
+rownames(mod4pars) <- unique(seedprod$sp_code)
+colnames(mod4pars) <- c("alpha", "sigma", paste0("plot_",740:763, "_lambda"), "convergence_code")
+
+# Model 5
+mod5pars <- matrix(NA, ncol = 50, nrow = length(unique(seedprod$sp_code)))
+rownames(mod5pars) <- unique(seedprod$sp_code)
+colnames(mod5pars) <- c("sigma", paste0("plot_",740:763, "_alpha"),paste0("plot_",740:763, "_lambda"), "convergence_code")
+
+for(sp in unique(seedprod$sp_code)) {
+  # Format vectors for the current species ===========
+  lseed <- seedprod %>% filter(sp_code == sp) %>% dplyr::select(num_seeds_produced) %>% log %>% unlist %>% as.numeric
+  dens <- seedprod %>% filter(sp_code == sp) %>% dplyr::select(N_per_neighborhood) %>% unlist %>% as.numeric
+  which_plot <- seedprod %>% filter(sp_code == sp) %>% dplyr::select(plot_num)
+  which_plot <- which_plot$plot_num
+  plot_yesno <- table(which_plot)
+  
+  # Make a site matrix- to be used by models 3, 4, and 5 =====
+  site_matrix <- seedprod %>% filter(sp_code == sp) %>%
+    mutate(site1 = ifelse(plot_num==740, 1, 0), 
+           site2 = ifelse(plot_num==741, 1, 0),
+           site3 = ifelse(plot_num==742, 1, 0),
+           site4 = ifelse(plot_num==743, 1, 0),
+           site5 = ifelse(plot_num==744, 1, 0),
+           site6 = ifelse(plot_num==745, 1, 0),
+           site7 = ifelse(plot_num==746, 1, 0),
+           site8 = ifelse(plot_num==747, 1, 0),
+           site9 = ifelse(plot_num==748, 1, 0),
+           site10 = ifelse(plot_num==749, 1, 0),
+           site11 = ifelse(plot_num==750, 1, 0),
+           site12 = ifelse(plot_num==751, 1, 0),
+           site13 = ifelse(plot_num==752, 1, 0),
+           site14 = ifelse(plot_num==753, 1, 0),
+           site15 = ifelse(plot_num==754, 1, 0),
+           site16 = ifelse(plot_num==755, 1, 0),
+           site17 = ifelse(plot_num==756, 1, 0),
+           site18 = ifelse(plot_num==757, 1, 0),
+           site19 = ifelse(plot_num==758, 1, 0),
+           site20 = ifelse(plot_num==759, 1, 0),
+           site21 = ifelse(plot_num==760, 1, 0),
+           site22 = ifelse(plot_num==761, 1, 0),
+           site23 = ifelse(plot_num==762, 1, 0),
+           site24 = ifelse(plot_num==763, 1, 0)
+    ) %>% dplyr::select(site1:site24) %>% as.matrix
+  
+  # Make a competition density matrix- to be used for Model 5 ======
+  compdens <- seedprod %>% filter(sp_code == sp) %>%
+  mutate(site1 = ifelse(plot_num==740, N_per_neighborhood, 0), 
+         site2 = ifelse(plot_num==741, N_per_neighborhood, 0),
+         site3 = ifelse(plot_num==742, N_per_neighborhood, 0),
+         site4 = ifelse(plot_num==743, N_per_neighborhood, 0),
+         site5 = ifelse(plot_num==744, N_per_neighborhood, 0),
+         site6 = ifelse(plot_num==745, N_per_neighborhood, 0),
+         site7 = ifelse(plot_num==746, N_per_neighborhood, 0),
+         site8 = ifelse(plot_num==747, N_per_neighborhood, 0),
+         site9 = ifelse(plot_num==748, N_per_neighborhood, 0),
+         site10 = ifelse(plot_num==749, N_per_neighborhood, 0),
+         site11 = ifelse(plot_num==750, N_per_neighborhood, 0),
+         site12 = ifelse(plot_num==751, N_per_neighborhood, 0),
+         site13 = ifelse(plot_num==752, N_per_neighborhood, 0),
+         site14 = ifelse(plot_num==753, N_per_neighborhood, 0),
+         site15 = ifelse(plot_num==754, N_per_neighborhood, 0),
+         site16 = ifelse(plot_num==755, N_per_neighborhood, 0),
+         site17 = ifelse(plot_num==756, N_per_neighborhood, 0),
+         site18 = ifelse(plot_num==757, N_per_neighborhood, 0),
+         site19 = ifelse(plot_num==758, N_per_neighborhood, 0),
+         site20 = ifelse(plot_num==759, N_per_neighborhood, 0),
+         site21 = ifelse(plot_num==760, N_per_neighborhood, 0),
+         site22 = ifelse(plot_num==761, N_per_neighborhood, 0),
+         site23 = ifelse(plot_num==762, N_per_neighborhood, 0),
+         site24 = ifelse(plot_num==763, N_per_neighborhood, 0)
+  ) %>% dplyr::select(site1:site24) %>% as.matrix
+  
+  # If there's fewer than 4 measured plants at a site, set it to zero later.
+  set_to_na <- as.vector(which(colSums(site_matrix) < 4))
+  
+  # The model runs start here --------------
+  
+  # Model 1 ======
+  # Set the mean and SD of lseed as the starting points for the first optimization
+  par = c(mean(lseed), sd(lseed))
+  # cat("Mean and SD for species:\n"); par
+  for(i in 1:25){
+    testcomp1<-optim(par,compmodel1)
+    par<-testcomp1$par
+    if(testcomp1$convergence==0){break}
+  }
+  print(paste(sp, ": Model 1 converged on rep", i))
+  mod1pars[sp,] <- c(testcomp1$par, testcomp1$convergence)
+
+  # Model 2 ========
+  # Set mean and SD from model 1, and alpha as 0.001 to run model 2
+  # Model 2 expects parameters in the order c(lambda, alpha, sigma)
+  par<-c(testcomp1$par[1],0.001,testcomp1$par[2])
+  for(i in 1:25){
+    testcomp2<-optim(par, compmodel2, lower = c(1, 0.0000001, 0.00000001), method="L-BFGS-B")
+    par<-testcomp2$par
+    if(testcomp2$convergence==0){break}
+  }
+  print(paste(sp, ": Model 2 converged on rep", i))
+  mod2pars[sp,] <- c(testcomp2$par, testcomp2$convergence)
+
+  # Model 3 ========
+  # Set the estimated global lambda, sigma, and global alpha as the beginning pars for this model; 
+  # The site-specific modifiers of lambda are initialized at 0.01
+  # Model 3 expects parameters in the order c(lambda,alpha, sigma, site effects*24)
+  par <- c(testcomp2$par[1],testcomp2$par[2], testcomp2$par[3], rep(0.01, 24))
+  for(i in 1:50){
+    testcomp3<-optim(par, compmodel3, method="L-BFGS-B", lower=c(1,0,0.000001, rep(0, 24)),
+                     control=list(maxit=10000), hessian=TRUE)
+    par<-testcomp3$par
+    if(testcomp3$convergence==0){break}
+  }
+  print(paste(sp, ": Model 3 converged on rep", i))
+  # testcomp3$par[set_to_na+3] <- 0
+  pars_to_save <- testcomp3$par
+  pars_to_save[set_to_na+3] <- NA
+  mod3pars[sp,] <- c(pars_to_save, testcomp3$convergence)
+  
+  # Model 4 =======
+  # Set the estimated global lambda as the initial value of the site specific lambdas;
+  # The sigma and alphas as estimated in model 2 as well.
+  # Model 4 expects parameters in the order c(alpha, sigma, lambdas*24)
+  par <- c(testcomp2$par[2], testcomp2$par[3], rep(testcomp2$par[1], 24))
+  for(i in 1:50){
+    testcomp4<-optim(par,compmodel4,  method="L-BFGS-B", lower=c(0,0.0000000001, c(rep(1,24))),
+                     control=list(maxit=10000), hessian=TRUE)
+    par<-testcomp4$par
+    if(testcomp4$convergence==0){break}
+  }
+  print(paste(sp, ": Model 4 converged on rep", i))
+  pars_to_save <- testcomp4$par
+  pars_to_save[set_to_na+2] <- NA
+
+  mod4pars[sp,] <- c(pars_to_save, testcomp4$convergence)
+  
+  # Model 5 =========
+  # Set the parameters based on the output from Model 4- sigma is mod4[2], testcomp[1] is the alpha est, 
+  # and 3:26 are the site-specific lambda estimates
+  # Model 5 expects parameters in the order c(sigma, alphas*24, lambdas*24)
+  par <- c(testcomp4$par[2], rep(testcomp4$par[1], 24), testcomp4$par[3:26])
+  for(i in 1:200){
+    testcomp5<-optim(par,compmodel5,  method="L-BFGS-B", lower=c(0.0000001, rep(0.0000000001, 24), rep(1, 24)),
+                     control=list(maxit=10000), hessian=TRUE)
+    par<-testcomp5$par
+    if(testcomp5$convergence==0){break}
+  }
+  print(paste(sp, ": Model 5 converged on rep", i))
+  pars_to_save <- testcomp5$par
+  pars_to_save[set_to_na+1] <- NA
+  pars_to_save[set_to_na+25] <- NA
+
+  mod5pars[sp,] <- c(pars_to_save, testcomp5$convergence)
+  
+  # Plot the seed production
+  # Make a vector of the predicted seed output- this is kind of tricky given the spatial goings on
+  # Predicted seed output should be (Lambda_for_plot)/(1+alpha_for_plot*plot_density)
+  # but we need things to repeat the right number of times...
+  
+  lambdas_per_site <- rep(mod5pars[sp, 26:49], colSums(site_matrix))
+  alphas_per_site <- rep(mod5pars[sp, 2:25], colSums(site_matrix))
+  
+  pred_lseed <- c(as.matrix(lambdas_per_site*site_matrix)/
+                    (1+alphas_per_site*compdens))[c(as.matrix(lambdas_per_site*site_matrix)/(1+alphas_per_site*compdens)) > 0]
+  plot(x = lseed, y =pred_lseed)
+  }
+
+# Save the outputs ===========
+# NOTE! Double check these outputs. Why are the convergence codes 1 now???
+# write.csv(mod1pars, "model_outputs/mod1pars.csv")
+# write.csv(mod2pars, "model_outputs/mod2pars.csv")
+# write.csv(mod3pars, "model_outputs/mod3pars.csv")
+# write.csv(mod4pars, "model_outputs/mod4pars.csv")
+# write.csv(mod5pars, "model_outputs/mod5pars.csv")
+```
+
+## To Do
+
+Here's some things that are yet to be done:   
+
+ - [ ] Figure out exactly how to use the Hessian that is produced from testcomps3,4,5. I have a vague understanding that the square root of the diagonals of the inverse of the matrix represent the standard error of the ML estimate.   
+ - [ ] Add code to plot the observed seed output vs. the seed output expected from the models  
+ - [ ] Compare the output from these models with a second analysis, of estimating all of these parameters from a call to `lmer` with `species*site*competitor density` as the predictor.
+ - [x] Up the max replicates of model 5 from 100 to 200, to see if the few remaining species that don't converge eventually do (maybe this doesn't matter in the end, can't hurt to try.)  
