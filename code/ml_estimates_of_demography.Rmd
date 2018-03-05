@@ -7,6 +7,7 @@ output: md_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+thinkpad = TRUE
 ```
 
 ## Set up competition models
@@ -145,30 +146,30 @@ compmodel5<-function(par){
   alpha24 <- par[25] 
   
   # Site specific lambas 
-  site1 <- par[25]
-  site2 <- par[26]
-  site3 <- par[27]
-  site4 <- par[28]
-  site5 <- par[29]
-  site6 <- par[30]
-  site7 <- par[31]
-  site8 <- par[32]
-  site9 <- par[33]
-  site10 <- par[34]
-  site11 <- par[35]
-  site12 <- par[36]
-  site13 <- par[37]
-  site14 <- par[38]
-  site15 <- par[39]
-  site16 <- par[40]
-  site17 <- par[41]
-  site18 <- par[42]
-  site19 <- par[43]
-  site20 <- par[44]
-  site21 <- par[45]
-  site22 <- par[46]
-  site23 <- par[47]
-  site24 <- par[48]
+  site1 <- par[26]
+  site2 <- par[27]
+  site3 <- par[28]
+  site4 <- par[29]
+  site5 <- par[30]
+  site6 <- par[31]
+  site7 <- par[32]
+  site8 <- par[33]
+  site9 <- par[34]
+  site10 <- par[35]
+  site11 <- par[36]
+  site12 <- par[37]
+  site13 <- par[38]
+  site14 <- par[39]
+  site15 <- par[40]
+  site16 <- par[41]
+  site17 <- par[42]
+  site18 <- par[43]
+  site19 <- par[44]
+  site20 <- par[45]
+  site21 <- par[46]
+  site22 <- par[47]
+  site23 <- par[48]
+  site24 <- par[49]
   
   
   # Predictive model
@@ -195,8 +196,15 @@ compmodel5<-function(par){
 
 ```{r import-data}
 library(dplyr)
-compdens <- read.csv("~/Dropbox/spatial_tapioca/data/performance/calculated/NCompetitors_per_plot.csv")
-seedprod <- read.csv("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", stringsAsFactors = F)
+library(ggplot2)
+if(thinkpad){
+    compdens <- read.csv("data/performance/calculated/NCompetitors_per_plot.csv")
+  seedprod <- read.csv("data/performance/seed_production_processed.csv", stringsAsFactors = F)
+
+} else {
+  compdens <- read.csv("~/Dropbox/spatial_tapioca/data/performance/calculated/NCompetitors_per_plot.csv")
+  seedprod <- read.csv("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", stringsAsFactors = F)
+}
 # replace 0s with NAs...
 seedprod[which(seedprod$num_seeds_produced == 0), "num_seeds_produced"] <- NA
 # maybe switch to be the minimum for the species?
@@ -311,7 +319,7 @@ for(sp in unique(seedprod$sp_code)) {
   ) %>% dplyr::select(site1:site24) %>% as.matrix
   
   # If there's fewer than 4 measured plants at a site, set it to zero later.
-  set_to_na <- as.vector(which(colSums(site_matrix) < 4))
+  set_to_na <- as.vector(which(plot_yesno < 4))
   
   # The model runs start here --------------
   
@@ -355,6 +363,7 @@ for(sp in unique(seedprod$sp_code)) {
   pars_to_save <- testcomp3$par
   pars_to_save[set_to_na+3] <- NA
   mod3pars[sp,] <- c(pars_to_save, testcomp3$convergence)
+  
   
   # Model 4 =======
   # Set the estimated global lambda as the initial value of the site specific lambdas;
