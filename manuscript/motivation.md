@@ -20,7 +20,7 @@ Since there's a ton of dimensionality to these models, and since I'm getting a l
 **H2**: Variation in responses of species to environmental gradients may be explained by their functional traits. This pattern might arise if the functional traits are indicative of species' environmental preference along the gradient sampled.  
 **H3**: Similarity in some traits may correlate with similarity in response to certain environmental variables. For example, drought tolerance may predict demographic responses to an aridity gradient but not to a light gradient, and seed size may predict responses to a soil texture gradient but not an aridity gradient. 
 
-![](figs/ch01-hypotheses.png)
+![](../figs/ch01-hypotheses.png)
 
 **Note**: Having recently read parts of Hilborn and Mangel's *The Ecological Detective*, I feel compelled to speak a bit in their language. The fundamental *hypothesis* of trait based ecology is that measurable functional traits, which capture some aspect of a species' ecological strategy, influence the distrubition and abundance of the species in predictable ways. With sufficient information about a species' traits, we should be able to predict its distribution, abundance, and response to the environment; and conversely with enough information regarding the environment of a location, we should be able to predict the distribution of traits that are found in that place. There's a number of competing *models* we can use to test various parts of this framework; my goal here is to build those reasonable models and test them against one another. We have predictions about which will best describe what is going on in the environment, and model selection will either hold up our expectations or suggest alternatives.
 
@@ -35,7 +35,7 @@ Before getting too deep into the specifics of the data we have from Sedgwick, I 
   
 The contrasting scenarios are summarized neatly in their Table S1:  
 
-![](figs/laughlin-tabs1.png)
+![](../figs/laughlin-tabs1.png)
 
 I'll come back to their methods in a bit, but for now I focus on their results and how they interpret things.
 
@@ -55,7 +55,7 @@ No trait exhibited independent main effects of survival because the adaptive val
 
 This paper is a really neat framing of part of what I'm hoping to do here- and I think I can do a neat analysis, even incorporating the ITV data I collected in 2017. Figure 1 from my dissertation proposal (see above) fits in neatly with Figure 1 of the Laughlin et al. paper- with the exception that I wasn't thinking about CWM traits during my proposal. An extention of this idea about the "adaptive value of traits" is that species "shift" their functional traits along environmental gradient in adaptive ways-- in other words, if there is predictable ITV along a gradient, then it ought to reflect the shifts in the adaptive value of the trait along the gradient. For instance, if species with high SLA respond positively to soil sand content, then we might expect individuals of a species growing in ghigher sand content to have higher SLA than individuals of the same spcies growing elsewhere. The following figure is an attempt at explaining this idea:  
 
-![](figs/hypothesis-w-itv.png)
+![](../figs/hypothesis-w-itv.png)
 
 
 Of course, this figures represents the "rosiest" view of what's going on- it traits were perfectly adaptive, and if the signal came through in CWM traits, the first two panels would work out as drawn, and if ITV were perfectly adaptive, all species would display ITV as in the top panel. I suspect we are unlikely to find such a clean pattern- and more thinking will likely highlight a nuanced story. Piecing together all the possible combinations will take me some time- but one way to organize this would be to take Table S1 from Laughlin et al (as above), and in turn split the four quadrants up into three- representing the three different ITV options. 

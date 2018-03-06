@@ -7,7 +7,6 @@ output: md_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-thinkpad = TRUE
 ```
 
 ## Set up competition models
@@ -108,8 +107,6 @@ compmodel4<-function(par){
   llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
   return(sum(-1*llik)) #sum of negative log likelihoods
 }
-
-
 ```
 
 
@@ -189,14 +186,13 @@ compmodel5<-function(par){
   llik<-dnorm(lseed,log(pred), sd=sigma, log=TRUE) #these are the log likelihoods
   return(sum(-1*llik)) #sum of negative log likelihoods
 }
-
 ```
 
 ## Read in data, munge, and run the ML models.
 
 ```{r import-data}
 library(dplyr)
-library(ggplot2)
+library(ggplot2); theme_set(theme_minimal())
 if(thinkpad){
     compdens <- read.csv("data/performance/calculated/NCompetitors_per_plot.csv")
   seedprod <- read.csv("data/performance/seed_production_processed.csv", stringsAsFactors = F)
@@ -253,7 +249,11 @@ colnames(mod4pars) <- c("alpha", "sigma", paste0("plot_",740:763, "_lambda"), "c
 mod5pars <- matrix(NA, ncol = 50, nrow = length(unique(seedprod$sp_code)))
 rownames(mod5pars) <- unique(seedprod$sp_code)
 colnames(mod5pars) <- c("sigma", paste0("plot_",740:763, "_alpha"),paste0("plot_",740:763, "_lambda"), "convergence_code")
+```
 
+And now we run the models on all species
+
+```{r run-models}
 for(sp in unique(seedprod$sp_code)) {
   # Format vectors for the current species ===========
   lseed <- seedprod %>% filter(sp_code == sp) %>% dplyr::select(num_seeds_produced) %>% log %>% unlist %>% as.numeric
@@ -291,6 +291,11 @@ for(sp in unique(seedprod$sp_code)) {
     ) %>% dplyr::select(site1:site24) %>% as.matrix
   
   # Make a competition density matrix- to be used for Model 5 ======
+  # make a vector named `densvector` for use later
+  densvector <- seedprod %>% filter(sp_code == sp) %>% dplyr::select(N_per_neighborhood) %>% unlist %>% as.numeric
+  # make a which_plot vector for later
+  which_plot <-   seedprod %>% filter(sp_code == sp) %>% dplyr::select(plot_num) %>% unlist %>% as.numeric
+
   compdens <- seedprod %>% filter(sp_code == sp) %>%
   mutate(site1 = ifelse(plot_num==740, N_per_neighborhood, 0), 
          site2 = ifelse(plot_num==741, N_per_neighborhood, 0),
@@ -319,7 +324,7 @@ for(sp in unique(seedprod$sp_code)) {
   ) %>% dplyr::select(site1:site24) %>% as.matrix
   
   # If there's fewer than 4 measured plants at a site, set it to zero later.
-  set_to_na <- as.vector(which(plot_yesno < 4))
+  set_to_na <- as.vector(which(colSums(site_matrix) < 4))
   
   # The model runs start here --------------
   
@@ -334,6 +339,13 @@ for(sp in unique(seedprod$sp_code)) {
   }
   print(paste(sp, ": Model 1 converged on rep", i))
   mod1pars[sp,] <- c(testcomp1$par, testcomp1$convergence)
+  # Predicted = ...
+  preds <- rep(mod1pars[sp,"lambda"], length(lseed))
+  mod1_predictions <- data.frame(observed = exp(lseed),
+                                 dens = densvector,
+                                 predicted = preds)
+  
+  gg_mod1_predVobs <- ggplot(mod1_predictions) + geom_point(aes(x = observed, y = predicted))
 
   # Model 2 ========
   # Set mean and SD from model 1, and alpha as 0.001 to run model 2
@@ -346,6 +358,13 @@ for(sp in unique(seedprod$sp_code)) {
   }
   print(paste(sp, ": Model 2 converged on rep", i))
   mod2pars[sp,] <- c(testcomp2$par, testcomp2$convergence)
+  # Predicted = ...
+  pred <- mod2pars[sp,"lambda"]/(1+mod2pars[sp,"alpha"]*densvector)
+  mod2_predictions <- data.frame(observed = exp(lseed),
+                                 dens = densvector,
+                                 predicted = preds)
+  gg_mod2_predVobs <- ggplot(mod2_predictions) + geom_point(aes(x = observed, y = predicted))
+
 
   # Model 3 ========
   # Set the estimated global lambda, sigma, and global alpha as the beginning pars for this model; 
@@ -363,8 +382,15 @@ for(sp in unique(seedprod$sp_code)) {
   pars_to_save <- testcomp3$par
   pars_to_save[set_to_na+3] <- NA
   mod3pars[sp,] <- c(pars_to_save, testcomp3$convergence)
+  # Predicted = ...
+  preds <- ((mod3pars[sp,"lambda"] + mod3pars[sp, 4:27]) %>% rep(., colSums(site_matrix)))/(1 + (mod3pars[sp,"alpha"]*densvector))
   
-  
+  mod3_predictions <- data.frame(observed = exp(lseed),
+                              dens = densvector,
+                              predicted = preds)
+
+  gg_mod3_predVobs <- ggplot(mod3_predictions) + geom_point(aes(x = observed, y = predicted))
+
   # Model 4 =======
   # Set the estimated global lambda as the initial value of the site specific lambdas;
   # The sigma and alphas as estimated in model 2 as well.
@@ -382,6 +408,12 @@ for(sp in unique(seedprod$sp_code)) {
 
   mod4pars[sp,] <- c(pars_to_save, testcomp4$convergence)
   
+  preds <- rep(mod4pars[sp, 3:26], colSums(site_matrix))/(1 + mod4pars[sp,"alpha"]*densvector)
+  mod4_predictions <- data.frame(observed = exp(lseed),
+                              dens = densvector,
+                              predicted = preds)
+  gg_mod4_predVobs <- ggplot(mod4_predictions) + geom_point(aes(x = observed, y = predicted)) 
+
   # Model 5 =========
   # Set the parameters based on the output from Model 4- sigma is mod4[2], testcomp[1] is the alpha est, 
   # and 3:26 are the site-specific lambda estimates
@@ -400,26 +432,53 @@ for(sp in unique(seedprod$sp_code)) {
 
   mod5pars[sp,] <- c(pars_to_save, testcomp5$convergence)
   
+  preds =  rep(mod5pars[sp, 26:49], colSums(site_matrix))/(1+(rep(mod5pars[sp,2:25], colSums(site_matrix))*densvector))
+  mod5_predictions <- data.frame(observed = exp(lseed),
+                              dens = densvector,
+                              predicted = preds,
+                              plot = which_plot)
+  gg_mod5_predVobs <- ggplot(mod5_predictions) + 
+    geom_point(aes(x = observed, y = predicted), color = alpha("black", .66), size = 2) + 
+    ggtitle(paste0(sp,": Predicted vs. Observed (site specific L & alpha)"))
+  
+  # PREDICTED SEED OUTPUT AGAINST BACKGROUND DENSITY
+  tmpx<-seq(0,50,length=200)
+  predicted_suppression <- data.frame(plot = rep(unique(which_plot), each = length(tmpx)),
+                                      density = rep(tmpx, length(unique(which_plot))),
+                                      predicted_seed = na.omit(rep(mod5pars[sp, 26:49], each = 200)/(1+(rep(mod5pars[sp,2:25], each = 200)*tmpx))))
+  
+  gg_mod5_predVdens <- ggplot(mod5_predictions) + geom_point(aes(x = dens, y = observed), 
+                                                             color = alpha("black", .75), size = 2) + 
+    geom_line(data = predicted_suppression, aes(x = density,y = predicted_seed)) + 
+    facet_wrap(~plot, scales = "free_y") + 
+    theme(strip.background = element_blank(), strip.placement = "outside") + 
+    ggtitle("Seed production across densities")
   # Plot the seed production
   # Make a vector of the predicted seed output- this is kind of tricky given the spatial goings on
   # Predicted seed output should be (Lambda_for_plot)/(1+alpha_for_plot*plot_density)
   # but we need things to repeat the right number of times...
+  # cowplot::plot_grid(gg_mod1_predVobs, gg_mod2_predVobs, gg_mod3_predVobs, gg_mod4_predVobs, gg_mod5_predVobs,gg_mod5_predVdens
+  plot_to_save <- cowplot::plot_grid(gg_mod5_predVobs, gg_mod5_predVdens, rel_widths = c(2,3))
+  ggsave(plot_to_save, filename = paste0("figs/scripted_figs/mod5_performance_",sp,".png"), width = 13, height = 7)
   
-  lambdas_per_site <- rep(mod5pars[sp, 26:49], colSums(site_matrix))
-  alphas_per_site <- rep(mod5pars[sp, 2:25], colSums(site_matrix))
+  # Compute some AICs
+  AIC1<-2*(testcomp1$value+length(testcomp1$par)) #2*log likelihood + numpar
+  AIC2<-2*(testcomp2$value+length(testcomp2$par))
+  AIC3<-2*(testcomp3$value+length(testcomp3$par))
+  AIC4<-2*(testcomp3$value+length(testcomp4$par))
+  AIC5<-2*(testcomp3$value+length(testcomp4$par))
   
-  pred_lseed <- c(as.matrix(lambdas_per_site*site_matrix)/
-                    (1+alphas_per_site*compdens))[c(as.matrix(lambdas_per_site*site_matrix)/(1+alphas_per_site*compdens)) > 0]
-  plot(x = lseed, y =pred_lseed)
-  }
+  aics_to_print <- cbind(species = rep(sp, 5), model = paste("Model",1:5), aic = c(AIC1, AIC2, AIC3, AIC4, AIC5))
+  write.csv(aics_to_print, file = paste0("model_outputs/", sp,"_aics.csv"))
+}
 
 # Save the outputs ===========
 # NOTE! Double check these outputs. Why are the convergence codes 1 now???
-# write.csv(mod1pars, "model_outputs/mod1pars.csv")
-# write.csv(mod2pars, "model_outputs/mod2pars.csv")
-# write.csv(mod3pars, "model_outputs/mod3pars.csv")
-# write.csv(mod4pars, "model_outputs/mod4pars.csv")
-# write.csv(mod5pars, "model_outputs/mod5pars.csv")
+write.csv(mod1pars, "model_outputs/mod1pars.csv")
+write.csv(mod2pars, "model_outputs/mod2pars.csv")
+write.csv(mod3pars, "model_outputs/mod3pars.csv")
+write.csv(mod4pars, "model_outputs/mod4pars.csv")
+write.csv(mod5pars, "model_outputs/mod5pars.csv")
 ```
 
 ## To Do
@@ -427,6 +486,7 @@ for(sp in unique(seedprod$sp_code)) {
 Here's some things that are yet to be done:   
 
  - [ ] Figure out exactly how to use the Hessian that is produced from testcomps3,4,5. I have a vague understanding that the square root of the diagonals of the inverse of the matrix represent the standard error of the ML estimate.   
- - [ ] Add code to plot the observed seed output vs. the seed output expected from the models  
+ - [x] Add code to plot the observed seed output vs. the seed output expected from the models  
  - [ ] Compare the output from these models with a second analysis, of estimating all of these parameters from a call to `lmer` with `species*site*competitor density` as the predictor.
  - [x] Up the max replicates of model 5 from 100 to 200, to see if the few remaining species that don't converge eventually do (maybe this doesn't matter in the end, can't hurt to try.)  
+ - [ ] Filter out individual parameter estimates based on <= 4 data points, not just 4 points per site (i.e. sometimes, alpha is estimated when there was only 1 comp individual was measured). See how much data is lost this way.
