@@ -3,6 +3,8 @@ title: "ML estimates of demographic parameters"
 author: "Gaurav Kandlikar"
 date: "February 28, 2018"
 output: md_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -194,8 +196,8 @@ compmodel5<-function(par){
 library(dplyr)
 library(ggplot2); theme_set(theme_minimal())
 if(thinkpad){
-    compdens <- read.csv("data/performance/calculated/NCompetitors_per_plot.csv")
-  seedprod <- read.csv("data/performance/seed_production_processed.csv", stringsAsFactors = F)
+  compdens <- read.csv("~/grad/dissertation-ch1/data/performance/calculated/NCompetitors_per_plot.csv")
+  seedprod <- read.csv("~/grad/dissertation-ch1/data/performance/seed_production_processed.csv", stringsAsFactors = F)
 
 } else {
   compdens <- read.csv("~/Dropbox/spatial_tapioca/data/performance/calculated/NCompetitors_per_plot.csv")
@@ -443,6 +445,7 @@ for(sp in unique(seedprod$sp_code)) {
   
   # PREDICTED SEED OUTPUT AGAINST BACKGROUND DENSITY
   tmpx<-seq(0,50,length=200)
+  ### THIS BREAKS FOR BRMA and probably other spps. 
   predicted_suppression <- data.frame(plot = rep(unique(which_plot), each = length(tmpx)),
                                       density = rep(tmpx, length(unique(which_plot))),
                                       predicted_seed = na.omit(rep(mod5pars[sp, 26:49], each = 200)/(1+(rep(mod5pars[sp,2:25], each = 200)*tmpx))))
@@ -465,8 +468,8 @@ for(sp in unique(seedprod$sp_code)) {
   AIC1<-2*(testcomp1$value+length(testcomp1$par)) #2*log likelihood + numpar
   AIC2<-2*(testcomp2$value+length(testcomp2$par))
   AIC3<-2*(testcomp3$value+length(testcomp3$par))
-  AIC4<-2*(testcomp3$value+length(testcomp4$par))
-  AIC5<-2*(testcomp3$value+length(testcomp4$par))
+  AIC4<-2*(testcomp4$value+length(testcomp4$par))
+  AIC5<-2*(testcomp5$value+length(testcomp4$par))
   
   aics_to_print <- cbind(species = rep(sp, 5), model = paste("Model",1:5), aic = c(AIC1, AIC2, AIC3, AIC4, AIC5))
   write.csv(aics_to_print, file = paste0("model_outputs/", sp,"_aics.csv"))
