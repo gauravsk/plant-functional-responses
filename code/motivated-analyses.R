@@ -34,30 +34,52 @@ focal_species <- unique(dat$sp_code)
 # focal_plots <- 740:755 # Toggle to select Candy Valley only
 focal_plots <- 740:763
 min_seed <- 0
-dat <- dat %>% filter(plot_type == "L") %>% 
+dat <- dat %>% # filter(plot_type == "L") %>% 
   filter(plot_num %in% focal_plots) %>%
   mutate(plot_num = paste0("plot_", plot_num),
          replicate = as.factor(replicate),
          num_seeds_produced = ifelse(is.na(num_seeds_produced), 0, num_seeds_produced)) %>%
   filter(num_seeds_produced >= min_seed) %>%
   rename(species = sp_code, seed_production = num_seeds_produced, site = plot_num) %>% 
-  select(-plot_type) %>%
   filter(species %in% focal_species)
 
+
+# Read in the ML estimates of lambda and "alpha" (i.e. sensitivity to competitors) ----------
+l_and_e_estimates <- read_delim("model_outputs/mod5pars.csv", delim = ",") %>% rename(species = X1)
+l_and_e_estimates <- l_and_e_estimates %>% select(-sigma,-convergence_code) %>% 
+  gather("type", "value", 2:49) %>% 
+  separate(type, sep = "_", into = c("delme","plot","type")) %>% unite(site, delme, plot, remove = T) %>%
+  spread("type", "value") 
+l_and_e_estimates
+# Merge in with `dat`
+dat <- left_join(dat, l_and_e_estimates)
+
+# Read in germination data ----------
+germ <- read_delim("~/Dropbox/spatial_tapioca/data/performance/calculated/plot_level_performance_summary.csv", delim = ",")
+germ <- germ %>% select(site = plot_num, plot_type, species = sp_code, mean_germ_percentage = germ_percentage) %>%
+  mutate(site = paste0("plot_", site))
+# Merge in with `dat`
+dat <- left_join(dat, germ)
+
+# Dat now has the following columns:
+# Site, replicate, species, seed_production, alpha, lambda, mean_germ_percentage
+
 dat
+
 ggdat <- ggplot(dat)
 gg_raw_seed <- ggplot(dat) + geom_boxplot(aes(site,seed_production+1)) + 
   facet_wrap(~species, ncol = 5) + scale_y_log10()
-gg_raw_seed
+X11(); gg_raw_seed
 
 gg_rawseed_hist <- ggplot(dat) + geom_histogram(aes(seed_production + 1))
-gridExtra::grid.arrange(gg_rawseed_hist + ggtitle("Unlogged"), 
-                        gg_rawseed_hist + scale_x_log10() + ggtitle("Logged"), ncol = 2) 
+X11(); gridExtra::grid.arrange(gg_rawseed_hist + ggtitle("Unlogged seed production"), 
+                        gg_rawseed_hist + scale_x_log10() + ggtitle("Logged seed production"), ncol = 2) 
 
+dat_l <- dat %>% filter(plot_type == "L")
 # Print out the mean and the sd
-dat %>% select(site, replicate, species, seed_production) %>% 
+dat_l %>% select(site, replicate, species, seed_production) %>% 
   tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
-dat %>% select(site, replicate, species, seed_production) %>% 
+dat_l %>% select(site, replicate, species, seed_production) %>% 
   tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
 
 
@@ -71,7 +93,7 @@ if(thinkpad){
 env_dat <- env_dat %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
 # skimr::skim(env_dat) %>% select(-missing, -complete, -n)
 
-plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
+X11(); plot(env_dat %>% filter(!(site %in% c("plot_758", "plot_759"))) %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
      pch = 21, bg = alpha("black", .25))
 
 # There's a ton of variables, and so we can do an NMDS to wrap our heads around the dimensionality
@@ -80,6 +102,7 @@ env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon, -Tmin, -ele) %>%
   as.data.frame %>% tibble::column_to_rownames("site") 
 
 soilmds <- metaMDS(env_dat_c)
+X11()
 par(mfrow = c(1,3))
 plot(soilmds, main = "NMDS", xlim = c(-.25, .25))
 orditorp(soilmds, display="species", cex = 1.2)
@@ -87,26 +110,18 @@ pc <-prcomp(env_dat_c %>% mutate_all(scale))
 plot(pc)
 biplot(pc, main = "PCA on scaled", cex = 1.3)
 
-# OK, there's a lot of dimensionality, but let's focus on these:
-# Ca:Mg ratio (data tells us it matters, and also we biologically know that it does)
-# Soil texture (let's go with Sand for now)
-# Nitrate (ppm), which goes strongly with organic_matter_ENR
-
-env_vars_for_analysis <- env_dat_c %>% data.frame %>%
-  tibble::rownames_to_column("site") %>%
-  mutate(ca_mg = Ca_ppm/Mg_ppm) %>%
-  select(site, ca_mg, nitrate_ppm = Nitrate_ppm, sand) %>% 
-  mutate_if(is.numeric, scale) %>% 
-  rename(ca_mg_scaled = ca_mg, nitrate_ppm_scaled = nitrate_ppm, sand_scaled = sand)
+# Merge in NMDS scores into env_dat
+env_dat <- left_join(env_dat, soilmds$points %>% data.frame %>% tibble::rownames_to_column("site"))
 
 # Now we merge this env_vars_for_analysis df with the performance data frame `dat`
+dat <- left_join(dat, env_dat)
 
-dat <- left_join(dat, env_vars_for_analysis)
-tbl_df(dat)
+dat_plot_yesno <- dat %>% group_by(site, plot_type,species) %>% mutate(seed_production = if_else(seed_production))
+
 ggdat <- ggplot(dat)
-gg_camg <- ggdat + geom_point(aes(x = ca_mg_scaled, y = seed_production+1), alpha = 1/5) + facet_wrap(~species) + scale_y_log10()
-gg_nitrate <- ggdat + geom_point(aes(x = nitrate_ppm_scaled, y = seed_production+1), alpha = 1/5) + facet_wrap(~species) + scale_y_log10()
-gg_sand <- ggdat + geom_point(aes(x = sand_scaled, y = seed_production+1), alpha = 1/5) + facet_wrap(~species) + scale_y_log10()
+
+gg_mds1 <- ggdat + geom_point(aes(x = MDS1, y = seed_production+1), alpha = 1/5) + facet_wrap(~species) + scale_y_log10()
+gg_mds2 <- ggdat + geom_point(aes(x = MDS2, y = seed_production+1), alpha = 1/5) + facet_wrap(~species) + scale_y_log10()
 
 gridExtra::grid.arrange(gg_camg,gg_nitrate, gg_sand, ncol = 3)
 
