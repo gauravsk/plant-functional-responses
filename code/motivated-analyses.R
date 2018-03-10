@@ -83,6 +83,8 @@ dat_l %>% select(site, replicate, species, seed_production) %>%
   tidyr::spread(species, seed_production) %>% summarize_if(is.numeric, funs(sd(.,na.rm = T)))
 
 
+
+
 # And now we bring in the environmental data for each site -----------
 if(thinkpad){
   env_dat <- read_delim("data/environmental/all_environmental_data.csv", delim = ",")
@@ -194,3 +196,61 @@ fit_nbinom_sandOnly <- glmmTMB(seed_production ~ sand_scaled, family = nbinom2, 
 
 AICtab(fit_zipoisson, fit_zipoisson2, fit_nbinom, fit_nbinom_norandoms, fit_nbinom_notrait, fit_nbinom_nocamg,
        fit_nbinom_sandOnly, fit_nbinom_nitrateOnly, fit_nbinom_camgOnly)
+ 
+
+# ---------------
+# Bring in estimates of L and r/alpha
+
+
+l_and_e_estimates <- read_delim("model_outputs/mod5pars.csv", delim = ",") %>% rename(species = X1)
+l_and_e_estimates <- l_and_e_estimates %>% select(-sigma,-convergence_code) %>% 
+  gather("type", "value", 2:49) %>% 
+  separate(type, sep = "_", into = c("delme","plot","type")) %>% unite(site, delme, plot, remove = T) %>%
+  spread("type", "value") 
+l_and_e_estimates
+
+ggplot(l_and_e_estimates) + 
+  geom_point(aes(x = lambda, y = alpha)) + 
+  facet_wrap(~species, scales = "free")
+l_and_e_estimates %>% filter(species == "HECO") %>% View
+
+env_dat_c <- left_join(env_dat_c %>% tibble::rownames_to_column("site"), 
+                       soilmds$points %>% data.frame %>% tibble::rownames_to_column("site"))
+# OK, there's a lot of dimensionality, but let's focus on these:
+# Ca:Mg ratio (data tells us it matters, and also we biologically know that it does)
+# Soil texture (let's go with Sand for now)
+# Nitrate (ppm), which goes strongly with organic_matter_ENR
+
+env_vars_for_analysis <- env_dat_c %>% data.frame %>%
+  mutate(ca_mg = Ca_ppm/Mg_ppm) %>%
+  select(site, ca_mg, nitrate_ppm = Nitrate_ppm, sand, MDS1, MDS2, depth) %>% 
+  mutate_if(is.numeric, scale) %>% 
+  rename(ca_mg_scaled = ca_mg, nitrate_ppm_scaled = nitrate_ppm, sand_scaled = sand)
+
+joined <- left_join(l_and_e_estimates, env_vars_for_analysis)
+
+# Add a "scaled_lambda" column to joined that has the lambda value, scaled by species
+joined <- left_join(joined, candi_v %>% select(species, site, lambda) %>% 
+                      tidyr::spread(., species, lambda) %>% mutate_if(is.numeric, scale) %>% 
+                      tidyr::gather(.,species, scaled_lambda, 2:18))
+
+ggplot(joined, aes(x = MDS1, y = scaled_lambda)) + geom_boxplot() + 
+  geom_point(color = alpha("black", .5), size = 2.5)
+
+plots_to_keep <- paste0("plot_", 740:763)
+
+candi_v <- joined %>% filter(site %in% plots_to_keep)
+ggplot(candi_v) + geom_point(aes(x = ca_mg_scaled, y = lambda)) + facet_wrap(~species, scales = "free_y")
+ggplot(candi_v) + geom_point(aes(x = nitrate_ppm_scaled, y = lambda)) + facet_wrap(~species, scales = "free_y")
+ggplot(candi_v) + geom_point(aes(x = sand_scaled, y = lambda)) + facet_wrap(~species, scales = "free_y")
+
+
+X11();ggplot(joined) + geom_point(aes(x = depth, y = scaled_lambda)) + facet_wrap(~species, scales = "free_y") + 
+  geom_smooth(aes(x = depth, y = scaled_lambda), method = "lm")
+X11();ggplot(joined) + geom_point(aes(x = depth, y = lambda)) + facet_wrap(~species, scales = "free_y") + scale_y_log10() +
+  geom_smooth(aes(x = depth, y = lambda), method = "lm")
+
+X11();ggplot(joined) + geom_point(aes(x = MDS1, y = scaled_lambda)) + facet_wrap(~species, scales = "free_y") + 
+  geom_smooth(aes(x = MDS1, y = scaled_lambda), method = "lm")
+X11();ggplot(joined) + geom_point(aes(x = MDS1, y = lambda)) + facet_wrap(~species, scales = "free_y") + scale_y_log10() +
+  geom_smooth(aes(x = MDS1, y = lambda), method = "lm")
