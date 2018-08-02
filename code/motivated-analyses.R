@@ -19,7 +19,7 @@ library(lme4)
 library(vegan)
 library(glmmTMB)
 library(bbmle)
-thinkpad = T
+thinkpad = F
 
 # Bring in seed production data ------------
 if(thinkpad){
@@ -29,8 +29,10 @@ if(thinkpad){
   dat <- read_delim("~/Dropbox/spatial_tapioca/data/performance/seed_production_processed.csv", 
                     col_names = T, delim = ",")
 }
-# focal_species <- c("PLER", "LACA", "HECO", "HOMU", "CEME", "AGHE", "LOWR", "AMME", "SACO", "CHGL")
-# focal_species <- unique(dat$sp_code)
+# focal_species <- c("PLER", "LACA", "HECO", 
+#                    "HOMU", "CEME", "AGHE", 
+#                    "LOWR", "AMME", "SACO", "CHGL")
+focal_species <- unique(dat$sp_code)
 # focal_plots <- 740:755 # Toggle to select Candy Valley only
 focal_plots <- 740:763
 min_seed <- 0
@@ -80,25 +82,36 @@ dat_sum <- dat %>% group_by(site, species) %>% summarize_if(is.numeric, funs(mea
 
 ggdat <- ggplot(dat_sum)
 gg_raw_seed <- ggdat + geom_boxplot(aes(site,lambda))
-X11(); gg_raw_seed
+ gg_raw_seed
 
 gg_lambda_hist <- ggdat + geom_histogram(aes(lambda))
-X11(); gridExtra::grid.arrange(gg_lambda_hist + ggtitle("Unlogged estimates of Lambda (sp x site)"), 
+ gridExtra::grid.arrange(gg_lambda_hist + ggtitle("Unlogged estimates of Lambda (sp x site)"), 
                                gg_lambda_hist + scale_x_log10() + ggtitle("Logged estimates of Lambda (sp x site)"), ncol = 2) 
 dat_sum$log_lambda <- log10(dat_sum$lambda)
 
 # And now we bring in the environmental data for each site -----------
+theme_gsk <- function() {
+  theme_minimal()+
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          plot.tag = element_text(face = "bold")
+    ) 
+}
+
 if(thinkpad){
   env_dat <- read_delim("data/environmental/all_environmental_data.csv", delim = ",")
 } else {
   env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv",
                         delim = ",") 
 }
-env_dat <- env_dat %>% rename(site = plot) %>% mutate(site = paste0("plot_", site))
+env_dat <- env_dat %>% filter(plot %in% focal_plots) %>%
+  rename(site = plot) %>% mutate(site = paste0("plot_", site))
 
 # skimr::skim(env_dat) %>% select(-missing, -complete, -n)
 
-X11(); plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
+ plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
      pch = 21, bg = alpha("black", .25))
 
 # There's a ton of variables, and so we can do an NMDS to wrap our heads around the dimensionality
@@ -106,23 +119,24 @@ X11(); plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele),
 env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon, -Tmin, -ele) %>% 
   as.data.frame %>% tibble::column_to_rownames("site") 
 
-soilmds <- metaMDS(env_dat_c)
-# X11()
-# par(mfrow = c(1,3))
-# plot(soilmds, main = "NMDS", xlim = c(-.25, .25))
-# orditorp(soilmds, display="species", cex = 1.2, col = "red")
-# orditorp(soilmds, display="sites", cex = 1, labels = as.character(740:763))
-# 
-# pc <-prcomp(env_dat_c %>% mutate_all(scale))
-# plot(pc)
-# biplot(pc, main = "PCA on scaled", cex = 1.3)
+soilmds <- metaMDS(env_dat_c, try = 100, trymax = 1000)
+
 soilmds_envVars <- data.frame(soilmds$species)
 soilmds_sites <- data.frame(soilmds$points)
-ggplot(soilmds_envVars) + geom_point(aes(x = MDS1, y = MDS2), col = "darkred", size = 2) + xlim(c(-.25,.25)) +
-  geom_text_repel(aes(MDS1, MDS2, label = rownames(soilmds_envVars)), col = "darkred", size = 5.2) +
-  geom_point(data = soilmds_sites, aes(MDS1, MDS2), size = .75, col = "grey25") +
-  geom_text_repel(data = soilmds_sites, aes(MDS1, MDS2, label = as.character(740:763)), 
-                  col = "grey25", force = 4, nudge_x = .005, nudge_y = .005)
+soilmds_envVars$labels = c("Max Temp", "Organic Matter", "pH", "CEC", "[K]", "[Mg]", "[Ca]", "[NH4]", "[Nitrate]",
+                           "Soil moisture", "Sand content", "Clay content", "Soil depth")
+ggplot(soilmds_envVars) + geom_point(aes(x = MDS1, y = MDS2),
+                                     col = "darkred", size = 3)+
+  geom_text_repel(aes(MDS1, MDS2, label = labels), 
+                  col = "darkred", size = 6, force = 10) +
+  geom_point(data = soilmds_sites, aes(MDS1, MDS2), 
+             size = .75, col = alpha("grey25", .5)) +
+  # geom_text_repel(data = soilmds_sites, aes(MDS1, MDS2, label = as.character(740:763)), 
+  #                 col = "grey25", force = 4, nudge_x = .005, nudge_y = .005) + 
+  theme_gsk() +
+  theme(axis.title = element_text(size = 16),
+        axis.line = element_line(colour = 'grey25', size = 0.8)) + 
+  NULL 
 
 # Merge in NMDS scores into env_dat
 env_dat <- left_join(env_dat, soilmds$points %>% data.frame %>% tibble::rownames_to_column("site"))
@@ -130,14 +144,14 @@ env_dat$ca_mg <- env_dat$Ca_ppm/env_dat$Mg_ppm
 # Now we merge this env_vars_for_analysis df with the performance data frame `dat`
 dat <- left_join(dat, env_dat)
 dat_sum <- left_join(dat_sum, env_dat)
-# dat_plot_yesno <- dat %>% group_by(site, plot_type,species) %>% mutate(seed_production = if_else(seed_production))
 
 # PLOTS -----------
 # Explore patterns in germination and lambda
 library(gridExtra)
 gg_plot_l <- ggplot(dat_sum, aes(x = plot_num, y = log_lambda)) + 
   geom_point(alpha = 1/2, size = 3) + 
-  facet_wrap(~species, scales = "free_y", ncol = 4) + geom_line() + ggtitle("Lambda  across plots")
+  facet_wrap(~species, scales = "free_y", ncol = 4) + geom_line() + 
+  ggtitle("Lambda  across plots")
 
 gg_plot_g <- ggplot(dat_sum, aes(x = plot_num, y = mean_germ_percentage)) + 
   geom_point(alpha = 1/2, size = 3) + 
@@ -146,9 +160,12 @@ gg_plot_g <- ggplot(dat_sum, aes(x = plot_num, y = mean_germ_percentage)) +
 
 # grid.arrange(gg_plot_l, gg_plot_g, ncol = 2)
 
-gg_camg_l <- ggplot(dat_sum, aes(x = ca_mg, y = log_lambda)) + geom_point(alpha = 1/2, size = 3) + 
-  facet_wrap(~species, scales = "free_y", ncol = 4) + geom_smooth(method = "lm") + scale_x_log10()
-gg_camg_g <- ggplot(dat_sum, aes(x = ca_mg, y = mean_germ_percentage)) + geom_point(alpha = 1/2, size = 3) + 
+gg_camg_l <- ggplot(dat_sum, aes(x = ca_mg, y = log_lambda)) + 
+  geom_point(alpha = 1/2, size = 3) + 
+  facet_wrap(~species, scales = "free_y", ncol = 4) + 
+  geom_smooth(method = "lm") + scale_x_log10()
+gg_camg_g <- ggplot(dat_sum, aes(x = ca_mg, y = mean_germ_percentage)) + 
+  geom_point(alpha = 1/2, size = 3) + 
   facet_wrap(~species, ncol = 4) + geom_smooth(method = "lm") + scale_x_log10()
 grid.arrange(gg_camg_l, gg_camg_g, ncol = 2)
 
@@ -167,9 +184,9 @@ gg_nitrate_l <- ggplot(dat_sum, aes(x = Nitrate_ppm, y = log_lambda)) + geom_poi
 gg_nitrate_g <- ggplot(dat_sum, aes(x = Nitrate_ppm, y = mean_germ_percentage)) + geom_point(alpha = 1/2, size = 3) + 
   facet_wrap(~species, ncol = 4) + geom_smooth(method = "lm") 
 
-gg_nitrate_l <- ggplot(dat_sum, aes(x = K_ppm, y = log_lambda)) + geom_point(alpha = 1/2, size = 3) + 
+gg_K_l <- ggplot(dat_sum, aes(x = K_ppm, y = log_lambda)) + geom_point(alpha = 1/2, size = 3) + 
   facet_wrap(~species, scales = "free_y", ncol = 4) + geom_smooth(method = "lm",formula = y ~ x + I(x^2)) 
-gg_nitrate_g <- ggplot(dat_sum, aes(x = K_ppm, y = mean_germ_percentage)) + geom_point(alpha = 1/2, size = 3) + 
+gg_K_g <- ggplot(dat_sum, aes(x = K_ppm, y = mean_germ_percentage)) + geom_point(alpha = 1/2, size = 3) + 
   facet_wrap(~species, ncol = 4) + geom_smooth(method = "lm") 
 
 
@@ -194,7 +211,7 @@ if(thinkpad){
                         delim = ",") 
 }
 traits <- traits %>% mutate(species = ifelse(species == "SACA", "SACO", species))
-traits <- traits %>% mutate(species = ifelse(species == "VUMA", "VUMI", species))
+# traits <- traits %>% mutate(species = ifelse(species == "VUMI", "VUMA", species))
 traits <- traits %>% select(-year_measured)
 scale_this <- function(x){
   (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
@@ -214,68 +231,265 @@ scaled_ls <- dat_sum %>% select(site, species, lambda) %>% tidyr::spread(species
   tidyr::gather("species", "scaled_lambda",2:18) 
 
 dat_sum <- left_join(dat_sum, scaled_ls) 
-dat_sum_sub <- dat_sum %>% filter(species %in% c("PLER", "LACA", "SACO", "AGHE", 
-                                                 "HOMU", "CEME", "HECO", "EUPE", 
-                                                 "LOWR", "VUMA", "CHGL")) %>%
+dat_sum_sub <- dat_sum %>%
   filter(site %in% paste0("plot_", 740:755))
 
 colnames(dat_sum)
 
-sla_fit <- lmer(log_lambda ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
+dat_sum_backup <- dat_sum
+dat_sum <- dat_sum %>% filter(species %in% focal_species)
+# SLA ----------
+# SLA X Lambda seeds
+sla_fit_nmds_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
               (1+species) + (1|site), data = dat_sum)
-sla_fit_sub <- lmer(log_lambda ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
-                   (1+species) + (1|site), data = dat_sum_sub)
-summary(sla_fit)
-summary(sla_fit_sub)
-car::Anova(sla_fit)
-car::Anova(sla_fit_sub)
+summary(sla_fit_nmds_lambda)
+car::Anova(sla_fit_nmds_lambda)
 
-seed_fit <- lmer(log_lambda ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
-                   (1+species) + (1|site), data = dat_sum)
-seed_fit_sub <- lmer(log_lambda ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
-                    (1+species) + (1|site), data = dat_sum_sub)
-summary(seed_fit)
-summary(seed_fit_sub)
-car::Anova(seed_fit)
-car::Anova(seed_fit_sub)
+sla_fit_camg_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
+                  (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_camg_lambda)
+car::Anova(sla_fit_camg_lambda)
 
-seed_fit_g <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
-                    (1+species) + (1|site), data = dat_sum)
-seed_fit_sub_g <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
-                      (1+species) + (1|site), data = dat_sum_sub)
-summary(seed_fit_g)
-summary(seed_fit_sub_g)
-car::Anova(seed_fit_g)
-car::Anova(seed_fit_sub_g)
-
-
-sla_fit_camg <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
-                   (1+species) + (1|site), data = dat_sum)
-sla_fit_camg_sub <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(ca_mg) +
-                       (1+species) + (1|site), data = dat_sum_sub)
-
-summary(sla_fit_camg)
-summary(sla_fit_camg_sub)
-car::Anova(sla_fit_camg)
-car::Anova(sla_fit_camg_sub)
-
-
-seed_fit_camg <- lmer(log_lambda ~ scaled_log_seed_mass_g*scale(ca_mg) + 
+sla_fit_nitrate_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
                        (1+species) + (1|site), data = dat_sum)
-seed_fit_camg_sub <- lmer(log_lambda ~ scaled_log_seed_mass_g*scale(ca_mg) +
-                           (1+species) + (1|site), data = dat_sum_sub)
-summary(seed_fit_camg)
-summary(seed_fit_camg_sub)
-car::Anova(seed_fit_camg)
-car::Anova(seed_fit_camg_sub)
+summary(sla_fit_nitrate_lambda)
+car::Anova(sla_fit_nitrate_lambda)
+
+# SLA X Germination-------
+
+sla_fit_nmds_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_nmds_germ)
+car::Anova(sla_fit_nmds_germ)
+
+sla_fit_camg_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_camg_germ)
+car::Anova(sla_fit_camg_germ)
+
+sla_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
+                          (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_nitrate_germ)
+car::Anova(sla_fit_nitrate_germ)
+
+# SLA X Alpha----------
+
+sla_fit_nmds_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_nmds_alpha)
+car::Anova(sla_fit_nmds_alpha)
+
+sla_fit_camg_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_camg_alpha)
+car::Anova(sla_fit_camg_alpha)
+
+sla_fit_nitrate_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
+                          (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_nitrate_alpha)
+car::Anova(sla_fit_nitrate_alpha)
+
+# seed mass -------
+# seed X Lambda seeds ---------
+seed_fit_nmds_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nmds_lambda)
+car::Anova(seed_fit_nmd_lambdas)
+
+seed_fit_camg_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*scale(ca_mg) + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_camg_lambda)
+car::Anova(seed_fit_camg_lambda)
+
+seed_fit_nitrate_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+                           (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nitrate_lambda)
+car::Anova(seed_fit_nitrate_lambda)
+
+# seed X Germination ------
+
+seed_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nmds_germ)
+car::Anova(seed_fit_nmds_germ)
+
+seed_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*scale(ca_mg) + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_camg_germ)
+car::Anova(seed_fit_camg_germ)
+
+seed_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+                           (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nitrate_germ)
+car::Anova(seed_fit_nitrate_germ)
 
 
-seed_fit_camg_g <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*scale(ca_mg) + 
-                     (1+species) + (1|site), data = dat_sum)
-seed_fit_sub_camg_g <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*scale(ca_mg) +
-                         (1+species) + (1|site), data = dat_sum_sub)
+# seed X Alpha ------
+seed_fit_nmds_alpha <- lmer(alpha ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nmds_alpha)
+car::Anova(seed_fit_nmds_alpha)
 
-summary(seed_fit_camg_g)
-summary(seed_fit_sub_camg_g)
-car::Anova(seed_fit_camg_g)
-car::Anova(seed_fit_sub_camg_g)
+seed_fit_camg_alpha <- lmer(alpha ~ scale(seed_mass_g)*scale(ca_mg) + 
+                        (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_camg_alpha)
+car::Anova(seed_fit_camg_alpha)
+
+seed_fit_nitrate_alpha <- lmer(alpha ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+                           (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_nitrate_alpha)
+car::Anova(seed_fit_nitrate_alpha)
+
+# Phenology -------
+# pheno X Lambda phenos ------
+pheno_fit_nmds_lambda <- lmer(log_lambda ~ scale(phenology)*MDS1 + scale(phenology)*MDS2 + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nmds_lambda)
+car::Anova(pheno_fit_nmds_lambda)
+
+pheno_fit_camg_lambda <- lmer(log_lambda ~ scale(phenology)*scale(ca_mg) + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_camg_lambda)
+car::Anova(pheno_fit_camg_lambda)
+
+pheno_fit_nitrate_lambda <- lmer(log_lambda ~ scale(phenology)*scale(Nitrate_ppm) + 
+                            (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nitrate_lambda)
+car::Anova(pheno_fit_nitrate_lambda)
+
+# pheno X Germination -----
+
+pheno_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(phenology)*MDS1 + scale(phenology)*MDS2 + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nmds_germ)
+car::Anova(pheno_fit_nmds_germ)
+
+pheno_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(phenology)*scale(ca_mg) + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_camg_germ)
+car::Anova(pheno_fit_camg_germ)
+
+pheno_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(phenology)*scale(Nitrate_ppm) + 
+                            (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nitrate_germ)
+car::Anova(pheno_fit_nitrate_germ)
+
+# pheno X Alpha -------
+
+pheno_fit_nmds_alpha <- lmer(alpha ~ scale(phenology)*MDS1 + scale(phenology)*MDS2 + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nmds_alpha)
+car::Anova(pheno_fit_nmds_alpha)
+
+pheno_fit_camg_alpha <- lmer(alpha ~ scale(phenology)*scale(ca_mg) + 
+                         (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_camg_alpha)
+car::Anova(pheno_fit_camg_alpha)
+
+pheno_fit_nitrate_alpha <- lmer(alpha ~ scale(phenology)*scale(Nitrate_ppm) + 
+                            (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_nitrate_alpha)
+car::Anova(pheno_fit_nitrate_alpha)
+
+
+# SRL ------------
+# srl X Lambda srls -----
+srl_fit_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*MDS1 + scale(scaled_log_srl_m_g)*MDS2 + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nmds_lambda)
+car::Anova(srl_fit_nmds_lambda)
+
+srl_fit_camg_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_camg_lambda)
+car::Anova(srl_fit_camg_lambda)
+
+srl_fit_nitrate_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+                          (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nitrate_lambda)
+car::Anova(srl_fit_nitrate_lambda)
+
+# srl X Germination ------
+
+srl_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*MDS1 + scale(scaled_log_srl_m_g)*MDS2 + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nmds_germ)
+car::Anova(srl_fit_nmds_germ)
+
+srl_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_camg_germ)
+car::Anova(srl_fit_camg_germ)
+
+srl_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+                          (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nitrate_germ)
+car::Anova(srl_fit_nitrate_germ)
+
+# srl X Alpha ------
+
+srl_fit_nmds_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*MDS1 + scale(scaled_log_srl_m_g)*MDS2 + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nmds_alpha)
+car::Anova(srl_fit_nmds_alpha)
+
+srl_fit_camg_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
+                       (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_camg_alpha)
+car::Anova(srl_fit_camg_alpha)
+
+srl_fit_nitrate_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+                          (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_nitrate_alpha)
+car::Anova(srl_fit_nitrate_alpha)
+
+# Phenology -----
+# rootDepth X Lambda rootDepths -----
+rootDepth_fit_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nmds_lambda)
+car::Anova(rootDepth_fit_nmds_lambda)
+
+rootDepth_fit_camg_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_camg_lambda)
+car::Anova(rootDepth_fit_camg_lambda)
+
+rootDepth_fit_nitrate_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+                                (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nitrate_lambda)
+car::Anova(rootDepth_fit_nitrate_lambda)
+
+# rootDepth X Germination -------
+
+rootDepth_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nmds_germ)
+car::Anova(rootDepth_fit_nmds_germ)
+
+rootDepth_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_camg_germ)
+car::Anova(rootDepth_fit_camg_germ)
+
+rootDepth_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+                                (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nitrate_germ)
+car::Anova(rootDepth_fit_nitrate_germ)
+
+# rootDepth X Alpha------
+rootDepth_fit_nmds_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nmds_alpha)
+car::Anova(rootDepth_fit_nmds_alpha)
+
+rootDepth_fit_camg_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_camg_alpha)
+car::Anova(rootDepth_fit_camg_alpha)
+
+rootDepth_fit_nitrate_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+                                (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_nitrate_alpha)
+car::Anova(rootDepth_fit_nitrate_alpha)
+
