@@ -125,8 +125,9 @@ soilmds_envVars <- data.frame(soilmds$species)
 soilmds_sites <- data.frame(soilmds$points)
 soilmds_envVars$labels = c("Max Temp", "Organic Matter", "pH", "CEC", "[K]", "[Mg]", "[Ca]", "[NH4]", "[Nitrate]",
                            "Soil moisture", "Sand content", "Clay content", "Soil depth")
-ggplot(soilmds_envVars) + geom_point(aes(x = MDS1, y = MDS2),
-                                     col = "darkred", size = 3)+
+ggplot(soilmds_envVars) + 
+  geom_point(aes(x = MDS1, y = MDS2),
+             col = "darkred", size = 3)+
   geom_text_repel(aes(MDS1, MDS2, label = labels), 
                   col = "darkred", size = 6, force = 10) +
   geom_point(data = soilmds_sites, aes(MDS1, MDS2), 
