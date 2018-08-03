@@ -106,9 +106,13 @@ if(thinkpad){
   env_dat <- read_delim("~/Dropbox/spatial_tapioca/data/environmental/all_environmental_data.csv",
                         delim = ",") 
 }
+bac_nmds_scores <- read_delim("data/bacterial_nmds_axes.csv", delim = ",") %>%
+  rename(site = X1, bac_MDS1 = MDS1, bac_MDS2 = MDS2)
+
 env_dat <- env_dat %>% filter(plot %in% focal_plots) %>%
   rename(site = plot) %>% mutate(site = paste0("plot_", site))
 
+env_dat <- left_join(env_dat, bac_nmds_scores)
 # skimr::skim(env_dat) %>% select(-missing, -complete, -n)
 
  plot(env_dat %>% select(-site, -lat, -lon, -type, - microsite, -ele), 
@@ -142,6 +146,9 @@ ggplot(soilmds_envVars) +
 # Merge in NMDS scores into env_dat
 env_dat <- left_join(env_dat, soilmds$points %>% data.frame %>% tibble::rownames_to_column("site"))
 env_dat$ca_mg <- env_dat$Ca_ppm/env_dat$Mg_ppm
+env_dat$CN_ratio_soil <- env_dat$organic_matter_ENR/(env_dat$Nitrate_ppm+env_dat$NH4_N_ppm)
+
+
 # Now we merge this env_vars_for_analysis df with the performance data frame `dat`
 dat <- left_join(dat, env_dat)
 dat_sum <- left_join(dat_sum, env_dat)
@@ -227,7 +234,8 @@ dat_sum <- left_join(dat_sum, traits)
 dat_sum <- left_join(dat_sum, traits_logged)
 dat_sum <- left_join(dat_sum, traits_logged_scaled)
 
-scaled_ls <- dat_sum %>% select(site, species, lambda) %>% tidyr::spread(species, lambda) %>% 
+scaled_ls <- dat_sum %>% select(site, species, lambda) %>% 
+  tidyr::spread(species, lambda) %>% 
   data.frame %>% mutate_if(is.numeric, scale_this) %>%  #unite(id, c("site", "replicate"), sep = "XX") %>%
   tidyr::gather("species", "scaled_lambda",2:18) 
 
@@ -251,10 +259,20 @@ sla_fit_camg_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(ca_mg) +
 summary(sla_fit_camg_lambda)
 car::Anova(sla_fit_camg_lambda)
 
-sla_fit_nitrate_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
+sla_fit_soil_CN_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(CN_ratio_soil) + 
                        (1+species) + (1|site), data = dat_sum)
-summary(sla_fit_nitrate_lambda)
-car::Anova(sla_fit_nitrate_lambda)
+summary(sla_fit_soil_CN_lambda)
+car::Anova(sla_fit_soil_CN_lambda)
+
+sla_fit_soil_ <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(CN_ratio_soil) + 
+                                 (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_soil_CN_lambda)
+car::Anova(sla_fit_soil_CN_lambda)
+
+sla_fit_soil_CN_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*scale(CN_ratio_soil) + 
+                                 (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_soil_CN_lambda)
+car::Anova(sla_fit_soil_CN_lambda)
 
 # SLA X Germination-------
 
@@ -263,15 +281,21 @@ sla_fit_nmds_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*MDS1 + sca
 summary(sla_fit_nmds_germ)
 car::Anova(sla_fit_nmds_germ)
 
+sla_fit_bac_nmds_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*bac_MDS1 + 
+                                scaled_log_sla_cm2_g*MDS2 + 
+                            (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_bac_nmds_germ)
+car::Anova(sla_fit_bac_nmds_germ)
+
 sla_fit_camg_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
                        (1+species) + (1|site), data = dat_sum)
 summary(sla_fit_camg_germ)
 car::Anova(sla_fit_camg_germ)
 
-sla_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
+sla_fit_soil_CN_germ <- lmer(mean_germ_percentage ~ scaled_log_sla_cm2_g*scale(CN_ratio_soil) + 
                           (1+species) + (1|site), data = dat_sum)
-summary(sla_fit_nitrate_germ)
-car::Anova(sla_fit_nitrate_germ)
+summary(sla_fit_soil_CN_germ)
+car::Anova(sla_fit_soil_CN_germ)
 
 # SLA X Alpha----------
 
@@ -280,71 +304,104 @@ sla_fit_nmds_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm
 summary(sla_fit_nmds_alpha)
 car::Anova(sla_fit_nmds_alpha)
 
+sla_fit_bac_nmds_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*bac_MDS1 + 
+                                 scaled_log_sla_cm2_g*bac_MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(sla_fit_bac_nmds_alpha)
+car::Anova(sla_fit_bac_nmds_alpha)
+
 sla_fit_camg_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*scale(ca_mg) + 
                        (1+species) + (1|site), data = dat_sum)
 summary(sla_fit_camg_alpha)
 car::Anova(sla_fit_camg_alpha)
 
-sla_fit_nitrate_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*scale(Nitrate_ppm) + 
+sla_fit_soil_CN_alpha <- lmer(alpha ~ scaled_log_sla_cm2_g*scale(CN_ratio_soil) + 
                           (1+species) + (1|site), data = dat_sum)
-summary(sla_fit_nitrate_alpha)
-car::Anova(sla_fit_nitrate_alpha)
+summary(sla_fit_soil_CN_alpha)
+car::Anova(sla_fit_soil_CN_alpha)
 
 # seed mass -------
 # seed X Lambda seeds ---------
-seed_fit_nmds_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+seed_fit_nmds_lambda <- lmer(log_lambda ~ scaled_log_seed_mass_g*MDS1 + 
+                               scaled_log_seed_mass_g*MDS2 + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_nmds_lambda)
-car::Anova(seed_fit_nmd_lambdas)
+car::Anova(seed_fit_nmds_lambda)
 
-seed_fit_camg_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*scale(ca_mg) + 
+seed_fit_bac_nmds_lambda <- lmer(log_lambda ~ scaled_log_seed_mass_g*bac_MDS1 + 
+                               scaled_log_seed_mass_g*bac_MDS2 + 
+                               (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_bac_nmds_lambda)
+car::Anova(seed_fit_bac_nmds_lambda)
+
+seed_fit_camg_lambda <- lmer(log_lambda ~ scaled_log_seed_mass_g*scale(ca_mg) + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_camg_lambda)
 car::Anova(seed_fit_camg_lambda)
 
-seed_fit_nitrate_lambda <- lmer(log_lambda ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+seed_fit_soil_CN_lambda <- lmer(log_lambda ~ scaled_log_seed_mass_g*scale(CN_ratio_soil) + 
                            (1+species) + (1|site), data = dat_sum)
-summary(seed_fit_nitrate_lambda)
-car::Anova(seed_fit_nitrate_lambda)
+summary(seed_fit_soil_CN_lambda)
+car::Anova(seed_fit_soil_CN_lambda)
 
 # seed X Germination ------
 
-seed_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+seed_fit_nmds_germ <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_nmds_germ)
 car::Anova(seed_fit_nmds_germ)
 
-seed_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*scale(ca_mg) + 
+seed_fit_bac_nmds_germ <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*bac_MDS1 + 
+                             scaled_log_seed_mass_g*bac_MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_bac_nmds_germ)
+car::Anova(seed_fit_bac_nmds_germ)
+
+
+seed_fit_camg_germ <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*scale(ca_mg) + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_camg_germ)
 car::Anova(seed_fit_camg_germ)
 
-seed_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+seed_fit_soil_CN_germ <- lmer(mean_germ_percentage ~ scaled_log_seed_mass_g*scale(CN_ratio_soil) + 
                            (1+species) + (1|site), data = dat_sum)
-summary(seed_fit_nitrate_germ)
-car::Anova(seed_fit_nitrate_germ)
+summary(seed_fit_soil_CN_germ)
+car::Anova(seed_fit_soil_CN_germ)
 
 
 # seed X Alpha ------
-seed_fit_nmds_alpha <- lmer(alpha ~ scale(seed_mass_g)*MDS1 + scale(seed_mass_g)*MDS2 + 
+seed_fit_nmds_alpha <- lmer(alpha ~ scaled_log_seed_mass_g*MDS1 + scaled_log_seed_mass_g*MDS2 + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_nmds_alpha)
 car::Anova(seed_fit_nmds_alpha)
 
-seed_fit_camg_alpha <- lmer(alpha ~ scale(seed_mass_g)*scale(ca_mg) + 
+seed_fit_bac_nmds_alpha <- lmer(alpha ~ scaled_log_seed_mass_g*bac_MDS1 + 
+                                  scaled_log_seed_mass_g*bac_MDS2 + 
+                              (1+species) + (1|site), data = dat_sum)
+summary(seed_fit_bac_nmds_alpha)
+car::Anova(seed_fit_bac_nmds_alpha)
+
+
+seed_fit_camg_alpha <- lmer(alpha ~ scaled_log_seed_mass_g*scale(ca_mg) + 
                         (1+species) + (1|site), data = dat_sum)
 summary(seed_fit_camg_alpha)
 car::Anova(seed_fit_camg_alpha)
 
-seed_fit_nitrate_alpha <- lmer(alpha ~ scale(seed_mass_g)*scale(Nitrate_ppm) + 
+seed_fit_soil_CN_alpha <- lmer(alpha ~ scaled_log_seed_mass_g*scale(CN_ratio_soil) + 
                            (1+species) + (1|site), data = dat_sum)
-summary(seed_fit_nitrate_alpha)
-car::Anova(seed_fit_nitrate_alpha)
+summary(seed_fit_soil_CN_alpha)
+car::Anova(seed_fit_soil_CN_alpha)
 
 # Phenology -------
 # pheno X Lambda phenos ------
-pheno_fit_nmds_lambda <- lmer(log_lambda ~ scale(phenology)*MDS1 + scale(phenology)*MDS2 + 
+pheno_fit_bac_nmds_lambda <- lmer(log_lambda ~ scale(phenology)*bac_MDS1 + 
+                                    scale(phenology)*bac_MDS2 + 
                          (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_bac_nmds_lambda)
+car::Anova(pheno_fit_bac_nmds_lambda)
+
+pheno_fit_nmds_lambda <- lmer(log_lambda ~ scale(phenology)*MDS1 + scale(phenology)*MDS2 + 
+                                (1+species) + (1|site), data = dat_sum)
 summary(pheno_fit_nmds_lambda)
 car::Anova(pheno_fit_nmds_lambda)
 
@@ -353,10 +410,10 @@ pheno_fit_camg_lambda <- lmer(log_lambda ~ scale(phenology)*scale(ca_mg) +
 summary(pheno_fit_camg_lambda)
 car::Anova(pheno_fit_camg_lambda)
 
-pheno_fit_nitrate_lambda <- lmer(log_lambda ~ scale(phenology)*scale(Nitrate_ppm) + 
+pheno_fit_soil_CN_lambda <- lmer(log_lambda ~ scale(phenology)*scale(CN_ratio_soil) + 
                             (1+species) + (1|site), data = dat_sum)
-summary(pheno_fit_nitrate_lambda)
-car::Anova(pheno_fit_nitrate_lambda)
+summary(pheno_fit_soil_CN_lambda)
+car::Anova(pheno_fit_soil_CN_lambda)
 
 # pheno X Germination -----
 
@@ -365,15 +422,21 @@ pheno_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(phenology)*MDS1 + scale
 summary(pheno_fit_nmds_germ)
 car::Anova(pheno_fit_nmds_germ)
 
+pheno_fit_bac_nmds_germ <- lmer(mean_germ_percentage ~ scale(phenology)*bac_MDS1 + 
+                                  scale(phenology)*bac_MDS2 + 
+                              (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_bac_nmds_germ)
+car::Anova(pheno_fit_bac_nmds_germ)
+
 pheno_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(phenology)*scale(ca_mg) + 
                          (1+species) + (1|site), data = dat_sum)
 summary(pheno_fit_camg_germ)
 car::Anova(pheno_fit_camg_germ)
 
-pheno_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(phenology)*scale(Nitrate_ppm) + 
+pheno_fit_soil_CN_germ <- lmer(mean_germ_percentage ~ scale(phenology)*scale(CN_ratio_soil) + 
                             (1+species) + (1|site), data = dat_sum)
-summary(pheno_fit_nitrate_germ)
-car::Anova(pheno_fit_nitrate_germ)
+summary(pheno_fit_soil_CN_germ)
+car::Anova(pheno_fit_soil_CN_germ)
 
 # pheno X Alpha -------
 
@@ -382,15 +445,22 @@ pheno_fit_nmds_alpha <- lmer(alpha ~ scale(phenology)*MDS1 + scale(phenology)*MD
 summary(pheno_fit_nmds_alpha)
 car::Anova(pheno_fit_nmds_alpha)
 
+pheno_fit_bac_nmds_alpha <- lmer(alpha ~ scale(phenology)*bac_MDS1 + 
+                                   scale(phenology)*bac_MDS2 + 
+                               (1+species) + (1|site), data = dat_sum)
+summary(pheno_fit_bac_nmds_alpha)
+car::Anova(pheno_fit_bac_nmds_alpha)
+
+
 pheno_fit_camg_alpha <- lmer(alpha ~ scale(phenology)*scale(ca_mg) + 
                          (1+species) + (1|site), data = dat_sum)
 summary(pheno_fit_camg_alpha)
 car::Anova(pheno_fit_camg_alpha)
 
-pheno_fit_nitrate_alpha <- lmer(alpha ~ scale(phenology)*scale(Nitrate_ppm) + 
+pheno_fit_soil_CN_alpha <- lmer(alpha ~ scale(phenology)*scale(CN_ratio_soil) + 
                             (1+species) + (1|site), data = dat_sum)
-summary(pheno_fit_nitrate_alpha)
-car::Anova(pheno_fit_nitrate_alpha)
+summary(pheno_fit_soil_CN_alpha)
+car::Anova(pheno_fit_soil_CN_alpha)
 
 
 # SRL ------------
@@ -400,15 +470,21 @@ srl_fit_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*MDS1 + scale(
 summary(srl_fit_nmds_lambda)
 car::Anova(srl_fit_nmds_lambda)
 
+srl_fit_bac_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*bac_MDS1 + 
+                                  scale(scaled_log_srl_m_g)*bac_MDS2 + 
+                              (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_bac_nmds_lambda)
+car::Anova(srl_fit_bac_nmds_lambda)
+
 srl_fit_camg_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
                        (1+species) + (1|site), data = dat_sum)
 summary(srl_fit_camg_lambda)
 car::Anova(srl_fit_camg_lambda)
 
-srl_fit_nitrate_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+srl_fit_soil_CN_lambda <- lmer(log_lambda ~ scale(scaled_log_srl_m_g)*scale(CN_ratio_soil) + 
                           (1+species) + (1|site), data = dat_sum)
-summary(srl_fit_nitrate_lambda)
-car::Anova(srl_fit_nitrate_lambda)
+summary(srl_fit_soil_CN_lambda)
+car::Anova(srl_fit_soil_CN_lambda)
 
 # srl X Germination ------
 
@@ -417,15 +493,21 @@ srl_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*MDS1 
 summary(srl_fit_nmds_germ)
 car::Anova(srl_fit_nmds_germ)
 
+srl_fit_bac_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*bac_MDS1 +
+                                scale(scaled_log_srl_m_g)*bac_MDS2 + 
+                            (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_bac_nmds_germ)
+car::Anova(srl_fit_bac_nmds_germ)
+
 srl_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
                        (1+species) + (1|site), data = dat_sum)
 summary(srl_fit_camg_germ)
 car::Anova(srl_fit_camg_germ)
 
-srl_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+srl_fit_soil_CN_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_srl_m_g)*scale(CN_ratio_soil) + 
                           (1+species) + (1|site), data = dat_sum)
-summary(srl_fit_nitrate_germ)
-car::Anova(srl_fit_nitrate_germ)
+summary(srl_fit_soil_CN_germ)
+car::Anova(srl_fit_soil_CN_germ)
 
 # srl X Alpha ------
 
@@ -434,63 +516,79 @@ srl_fit_nmds_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*MDS1 + scale(scaled
 summary(srl_fit_nmds_alpha)
 car::Anova(srl_fit_nmds_alpha)
 
+srl_fit_bac_nmds_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*bac_MDS1 + 
+                                 scale(scaled_log_srl_m_g)*bac_MDS2 + 
+                             (1+species) + (1|site), data = dat_sum)
+summary(srl_fit_bac_nmds_alpha)
+car::Anova(srl_fit_bac_nmds_alpha)
+
 srl_fit_camg_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*scale(ca_mg) + 
                        (1+species) + (1|site), data = dat_sum)
 summary(srl_fit_camg_alpha)
 car::Anova(srl_fit_camg_alpha)
 
-srl_fit_nitrate_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*scale(Nitrate_ppm) + 
+srl_fit_soil_CN_alpha <- lmer(alpha ~ scale(scaled_log_srl_m_g)*scale(CN_ratio_soil) + 
                           (1+species) + (1|site), data = dat_sum)
-summary(srl_fit_nitrate_alpha)
-car::Anova(srl_fit_nitrate_alpha)
+summary(srl_fit_soil_CN_alpha)
+car::Anova(srl_fit_soil_CN_alpha)
 
-# Phenology -----
 # rootDepth X Lambda rootDepths -----
 rootDepth_fit_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
                              (1+species) + (1|site), data = dat_sum)
 summary(rootDepth_fit_nmds_lambda)
 car::Anova(rootDepth_fit_nmds_lambda)
 
-rootDepth_fit_camg_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
+rootDepth_fit_bac_nmds_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*bac_MDS1 + 
+                                        scale(scaled_log_rooting_depth_mm)*bac_MDS2 + 
+                                    (1+species) + (1|site), data = dat_sum)
+summary(rootDepth_fit_bac_nmds_lambda)
+car::Anova(rootDepth_fit_bac_nmds_lambda)
+
+rootDepth_fit_camg_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*
+                                    scale(ca_mg) + 
                              (1+species) + (1|site), data = dat_sum)
 summary(rootDepth_fit_camg_lambda)
 car::Anova(rootDepth_fit_camg_lambda)
 
-rootDepth_fit_nitrate_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+rootDepth_fit_soil_CN_lambda <- lmer(log_lambda ~ scale(scaled_log_rooting_depth_mm)*scale(CN_ratio_soil) + 
                                 (1+species) + (1|site), data = dat_sum)
-summary(rootDepth_fit_nitrate_lambda)
-car::Anova(rootDepth_fit_nitrate_lambda)
+summary(rootDepth_fit_soil_CN_lambda)
+car::Anova(rootDepth_fit_soil_CN_lambda)
 
 # rootDepth X Germination -------
 
-rootDepth_fit_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
+rootDepth_fit_bac_nmds_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*bac_MDS1 + 
+                                      scale(scaled_log_rooting_depth_mm)*bac_MDS2 + 
                              (1+species) + (1|site), data = dat_sum)
-summary(rootDepth_fit_nmds_germ)
-car::Anova(rootDepth_fit_nmds_germ)
+summary(rootDepth_fit_bac_nmds_germ)
+car::Anova(rootDepth_fit_bac_nmds_germ)
 
 rootDepth_fit_camg_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
                              (1+species) + (1|site), data = dat_sum)
 summary(rootDepth_fit_camg_germ)
 car::Anova(rootDepth_fit_camg_germ)
 
-rootDepth_fit_nitrate_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+rootDepth_fit_soil_CN_germ <- lmer(mean_germ_percentage ~ scale(scaled_log_rooting_depth_mm)*scale(CN_ratio_soil) + 
                                 (1+species) + (1|site), data = dat_sum)
-summary(rootDepth_fit_nitrate_germ)
-car::Anova(rootDepth_fit_nitrate_germ)
+summary(rootDepth_fit_soil_CN_germ)
+car::Anova(rootDepth_fit_soil_CN_germ)
 
 # rootDepth X Alpha------
-rootDepth_fit_nmds_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*MDS1 + scale(scaled_log_rooting_depth_mm)*MDS2 + 
+rootDepth_fit_bac_nmds_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*bac_MDS1 + 
+                                   scale(scaled_log_rooting_depth_mm)*bac_MDS2 + 
                              (1+species) + (1|site), data = dat_sum)
-summary(rootDepth_fit_nmds_alpha)
-car::Anova(rootDepth_fit_nmds_alpha)
+summary(rootDepth_fit_bac_nmds_alpha)
+car::Anova(rootDepth_fit_bac_nmds_alpha)
 
-rootDepth_fit_camg_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*scale(ca_mg) + 
+rootDepth_fit_camg_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*
+                                   scale(ca_mg) + 
                              (1+species) + (1|site), data = dat_sum)
 summary(rootDepth_fit_camg_alpha)
 car::Anova(rootDepth_fit_camg_alpha)
 
-rootDepth_fit_nitrate_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*scale(Nitrate_ppm) + 
+rootDepth_fit_soil_CN_alpha <- lmer(alpha ~ scale(scaled_log_rooting_depth_mm)*
+                                      scale(CN_ratio_soil) + 
                                 (1+species) + (1|site), data = dat_sum)
-summary(rootDepth_fit_nitrate_alpha)
-car::Anova(rootDepth_fit_nitrate_alpha)
+summary(rootDepth_fit_soil_CN_alpha)
+car::Anova(rootDepth_fit_soil_CN_alpha)
 
