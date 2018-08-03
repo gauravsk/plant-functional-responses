@@ -19,7 +19,7 @@ library(lme4)
 library(vegan)
 library(glmmTMB)
 library(bbmle)
-thinkpad = F
+thinkpad = T
 
 # Bring in seed production data ------------
 if(thinkpad){
@@ -120,22 +120,24 @@ env_dat <- left_join(env_dat, bac_nmds_scores)
 
 # There's a ton of variables, and so we can do an NMDS to wrap our heads around the dimensionality
 
-env_dat_c <- env_dat %>% select(-type, -microsite, -lat, -lon, -Tmin, -ele) %>% 
-  as.data.frame %>% tibble::column_to_rownames("site") 
+env_dat_c <- env_dat %>% 
+  select(-type, -microsite, -lat, -lon, -Tmin, -ele, -bac_MDS1, -bac_MDS2) %>% 
+  as.data.frame %>% 
+  tibble::column_to_rownames("site") 
 
 soilmds <- metaMDS(env_dat_c, try = 100, trymax = 1000)
 
 soilmds_envVars <- data.frame(soilmds$species)
 soilmds_sites <- data.frame(soilmds$points)
-soilmds_envVars$labels = c("Max Temp", "Organic Matter", "pH", "CEC", "[K]", "[Mg]", "[Ca]", "[NH4]", "[Nitrate]",
+soilmds_envVars$labels = c("Max Temp", "Organic C", "pH", "CEC", "[K]", "[Mg]", "[Ca]", "[NH4]", "[Nitrate]",
                            "Soil moisture", "Sand content", "Clay content", "Soil depth")
-ggplot(soilmds_envVars) + 
-  geom_point(aes(x = MDS1, y = MDS2),
-             col = "darkred", size = 3)+
-  geom_text_repel(aes(MDS1, MDS2, label = labels), 
-                  col = "darkred", size = 6, force = 10) +
+ggsoil <- ggplot(soilmds_envVars) + 
+  # geom_point(aes(x = MDS1, y = MDS2),
+             # col = "darkred", size = 3)+
   geom_point(data = soilmds_sites, aes(MDS1, MDS2), 
-             size = .75, col = alpha("grey25", .5)) +
+             size = 3, pch = 21, stroke = 1, fill = "grey75") +
+  geom_text(aes(x = MDS1, y = MDS2, label = labels), 
+                  col = "darkred", size = 6) +
   # geom_text_repel(data = soilmds_sites, aes(MDS1, MDS2, label = as.character(740:763)), 
   #                 col = "grey25", force = 4, nudge_x = .005, nudge_y = .005) + 
   theme_gsk() +
@@ -143,6 +145,7 @@ ggplot(soilmds_envVars) +
         axis.line = element_line(colour = 'grey25', size = 0.8)) + 
   NULL 
 
+ggsave("figs/soil_nmds.png", ggsoil, width = 8, height = 6, units = "in", dpi = 600)
 # Merge in NMDS scores into env_dat
 env_dat <- left_join(env_dat, soilmds$points %>% data.frame %>% tibble::rownames_to_column("site"))
 env_dat$ca_mg <- env_dat$Ca_ppm/env_dat$Mg_ppm
@@ -249,6 +252,7 @@ dat_sum_backup <- dat_sum
 dat_sum <- dat_sum %>% filter(species %in% focal_species)
 # SLA ----------
 # SLA X Lambda seeds
+dat_sum$scaled_ca_mg <- scale(dat_sum$ca_mg)
 sla_fit_nmds_lambda <- lmer(log_lambda ~ scaled_log_sla_cm2_g*MDS1 + scaled_log_sla_cm2_g*MDS2 + 
               (1+species) + (1|site), data = dat_sum)
 summary(sla_fit_nmds_lambda)
